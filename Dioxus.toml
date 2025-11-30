@@ -1,0 +1,28 @@
+[application]
+name = "chat-tui"
+
+[bundle]
+identifier = "com.spacetimedb.chat-tui"
+publisher = "SpacetimeDB"
+category = "DeveloperTool"
+
+[profile.dev]
+# Enable hot-reloading
+hot_reload = true
+
+[profile.dev.build]
+# Pass the devtools feature when building in dev mode for hot-reload
+features = ["devtools"]
+
+[profile.release.build]
+# Don't include devtools in release builds
+features = []
+
+# Web settings - disable since we're a TUI
+[web.watcher]
+# Don't reload the page
+reload_html = false
+
+[web.app]
+# Don't serve a web server
+base_path = ""

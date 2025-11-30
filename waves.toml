@@ -1,0 +1,45 @@
+[[waves]]
+wave_number = 1
+spawn_interval = 2.0
+
+[[waves.spawns]]
+unit_id = "warrior"
+count = 5
+health_multiplier = 1.0
+
+[[waves]]
+wave_number = 2
+spawn_interval = 1.7999999523162842
+
+[[waves.spawns]]
+unit_id = "warrior"
+count = 8
+health_multiplier = 1.2000000476837158
+
+[[waves]]
+wave_number = 3
+spawn_interval = 1.5
+
+[[waves.spawns]]
+unit_id = "warrior"
+count = 5
+health_multiplier = 1.5
+
+[[waves.spawns]]
+unit_id = "archer"
+count = 3
+health_multiplier = 1.0
+
+[[waves]]
+wave_number = 4
+spawn_interval = 1.5
+
+[[waves.spawns]]
+unit_id = "warrior"
+count = 10
+health_multiplier = 1.7999999523162842
+
+[[waves.spawns]]
+unit_id = "lancer"
+count = 2
+health_multiplier = 1.0

@@ -1,0 +1,26 @@
+[[units]]
+id = "warrior"
+name = "Red Warrior"
+sprite_path = "Units/Red Units/Warrior/Warrior_Run.png"
+base_health = 50.0
+base_speed = 50.0
+damage_to_base = 1
+gold_reward = 10
+
+[[units]]
+id = "archer"
+name = "Red Archer"
+sprite_path = "Units/Red Units/Archer/Archer_Run.png"
+base_health = 30.0
+base_speed = 60.0
+damage_to_base = 1
+gold_reward = 8
+
+[[units]]
+id = "lancer"
+name = "Red Lancer"
+sprite_path = "Units/Red Units/Lancer/Lancer_Run.png"
+base_health = 80.0
+base_speed = 40.0
+damage_to_base = 2
+gold_reward = 15
