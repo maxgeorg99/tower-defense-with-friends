@@ -7,7 +7,9 @@ use module_bindings::*;
 use std::env;
 use std::sync::{Arc, Mutex};
 
-use spacetimedb_sdk::{credentials, DbContext, Error, Event, Identity, Status, Table, TableWithPrimaryKey};
+use spacetimedb_sdk::{
+    DbContext, Error, Event, Identity, Status, Table, TableWithPrimaryKey, credentials,
+};
 use tui::AppState;
 
 // ## Define the main function
@@ -31,10 +33,10 @@ fn main() {
     // Register callbacks to run in response to database events.
     register_callbacks(&ctx, app_state.clone());
 
-    // Subscribe to SQL queries in order to construct a local partial replica of the database.
+    // Subscribe to SQL.
     subscribe_to_tables(&ctx, app_state.clone());
 
-    // Spawn a thread, where the connection will process messages and invoke callbacks.
+    // Spawn a thread.
     ctx.run_threaded();
 
     // Run the TUI
@@ -59,7 +61,9 @@ fn connect_to_db(my_identity: Arc<Mutex<Option<Identity>>>) -> DbConnection {
 
     let mut builder = DbConnection::builder()
         // Register our `on_connect` callback, which will save our auth token.
-        .on_connect(move |ctx, identity, token| on_connected(ctx, identity, token, my_identity.clone()))
+        .on_connect(move |ctx, identity, token| {
+            on_connected(ctx, identity, token, my_identity.clone())
+        })
         // Register our `on_connect_error` callback, which will print a message, then exit the process.
         .on_connect_error(on_connect_error)
         // Our `on_disconnect` callback, which will print a message, then exit the process.
@@ -89,7 +93,12 @@ fn creds_store() -> credentials::File {
 }
 
 /// Our `on_connect` callback: save our credentials to a file (unless using fresh identity).
-fn on_connected(_ctx: &DbConnection, identity: Identity, token: &str, my_identity: Arc<Mutex<Option<Identity>>>) {
+fn on_connected(
+    _ctx: &DbConnection,
+    identity: Identity,
+    token: &str,
+    my_identity: Arc<Mutex<Option<Identity>>>,
+) {
     // Only save credentials if not using a fresh identity
     if env::var("FRESH_IDENTITY").is_err() {
         if let Err(e) = creds_store().save(token) {

@@ -25,7 +25,10 @@ path = "src/tower_manager.rs"
 
 [dependencies]
 spacetimedb-sdk = { version = "1.8.*" }
-ratatui = "0.29.0"
+ratatui = "0.30.0"
+ratatui-image = "10.0.2"
+chafa = "0.1.1"
+image = "0.25.9"
 crossterm = "0.29.0"
 subsecond = "0.7"
 dioxus-devtools = { version = "0.7", optional = true }
