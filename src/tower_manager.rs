@@ -6,6 +6,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use ratatui::backend::Backend;
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
@@ -14,11 +15,13 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
+use ratatui_image::StatefulImage;
+use ratatui_image::picker::Picker;
+use ratatui_image::protocol::StatefulProtocol;
 use std::{
     fs,
     io::{self, stdout},
 };
-
 // === APP STATE ===
 
 enum SelectedPanel {
@@ -82,6 +85,9 @@ struct App {
     selected_field: TowerField,
     editing: bool,
     edit_buffer: String,
+    picker: Picker,
+    tower_image: Option<StatefulProtocol>,
+    projectile_image: Option<StatefulProtocol>,
 }
 
 impl App {
@@ -100,16 +106,40 @@ impl App {
             selected_field: TowerField::Id,
             editing: false,
             edit_buffer: String::new(),
+            picker: Picker::from_query_stdio().unwrap_or(Picker::halfblocks()),
+            tower_image: None,
+            projectile_image: None,
         };
 
         if !app.towers.is_empty() {
             app.tower_list_state.select(Some(0));
             app.current_tower = Some(app.towers[0].clone());
+            app.load_selected_tower_image();
         }
 
         Ok(app)
     }
 
+    fn load_selected_tower_image(&mut self) {
+        if let Some(idx) = self.tower_list_state.selected() {
+            if let Some(unit) = self.towers.get(idx) {
+                let sprite_path = format!("assets/{}", unit.sprite_path);
+                if let Ok(dyn_img) = image::ImageReader::open(&sprite_path).and_then(|r| {
+                    r.decode()
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+                }) {
+                    self.tower_image = Some(self.picker.new_resize_protocol(dyn_img));
+                }
+                let projectile_path = format!("assets/{}", unit.projectile_sprite);
+                if let Ok(projectile_img) = image::ImageReader::open(&projectile_path).and_then(|r| {
+                    r.decode()
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+                }) {
+                    self.projectile_image = Some(self.picker.new_resize_protocol(projectile_img));
+                }
+            }
+        }
+    }
     fn next_tower(&mut self) {
         let i = match self.tower_list_state.selected() {
             Some(i) => {
@@ -123,6 +153,7 @@ impl App {
         };
         self.tower_list_state.select(Some(i));
         self.current_tower = Some(self.towers[i].clone());
+        self.load_selected_tower_image();
     }
 
     fn previous_tower(&mut self) {
@@ -138,6 +169,7 @@ impl App {
         };
         self.tower_list_state.select(Some(i));
         self.current_tower = Some(self.towers[i].clone());
+        self.load_selected_tower_image();
     }
 
     fn save(&mut self) -> io::Result<()> {
@@ -240,6 +272,7 @@ impl App {
                 TowerField::SpritePath => {
                     if !self.edit_buffer.is_empty() {
                         self.towers[tower_idx].sprite_path = self.edit_buffer.clone();
+                        self.load_selected_tower_image();
                         Ok(format!("Sprite path updated"))
                     } else {
                         Err("Sprite path cannot be empty".to_string())
@@ -248,6 +281,7 @@ impl App {
                 TowerField::ProjectileSprite => {
                     if !self.edit_buffer.is_empty() {
                         self.towers[tower_idx].projectile_sprite = self.edit_buffer.clone();
+                        self.load_selected_tower_image();
                         Ok(format!("Projectile sprite updated"))
                     } else {
                         Err("Projectile sprite cannot be empty".to_string())
@@ -333,14 +367,82 @@ fn ui(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
         .split(chunks[0]);
 
+    let tower_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(12), Constraint::Min(0)])
+        .split(main_chunks[1]);
+
+    let tower_image_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(tower_chunks[0]);
+
     // Render towers list
     render_towers_list(f, app, main_chunks[0]);
 
+    // Render tower image preview
+    render_tower_image(f, app, tower_image_chunks[0]);
+
+    // Render projectile image preview
+    render_projectile_image(f, app, tower_image_chunks[1]);
+
     // Render tower details
-    render_tower_details(f, app, main_chunks[1]);
+    render_tower_details(f, app, tower_chunks[1]);
 
     // Render status bar
     render_status_bar(f, app, chunks[1]);
+}
+
+fn render_projectile_image(f: &mut Frame, app: &mut App, area: Rect) {
+    let is_selected = matches!(app.selected_panel, SelectedPanel::TowerDetails);
+    let border_style = if is_selected {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default()
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Projectile Preview")
+        .border_style(border_style);
+
+    let inner_area = block.inner(area);
+    f.render_widget(block, area);
+
+    if let Some(ref mut image_protocol) = app.projectile_image {
+        let image_widget = StatefulImage::default();
+        f.render_stateful_widget(image_widget, inner_area, image_protocol);
+    } else {
+        let placeholder =
+            Paragraph::new("No image available").style(Style::default().fg(Color::DarkGray));
+        f.render_widget(placeholder, inner_area);
+    }
+}
+
+fn render_tower_image(f: &mut Frame, app: &mut App, area: Rect) {
+    let is_selected = matches!(app.selected_panel, SelectedPanel::TowerDetails);
+    let border_style = if is_selected {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default()
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Tower Preview")
+        .border_style(border_style);
+
+    let inner_area = block.inner(area);
+    f.render_widget(block, area);
+
+    if let Some(ref mut image_protocol) = app.tower_image {
+        let image_widget = StatefulImage::default();
+        f.render_stateful_widget(image_widget, inner_area, image_protocol);
+    } else {
+        let placeholder =
+            Paragraph::new("No image available").style(Style::default().fg(Color::DarkGray));
+        f.render_widget(placeholder, inner_area);
+    }
 }
 
 fn render_towers_list(f: &mut Frame, app: &mut App, area: Rect) {
@@ -389,7 +491,7 @@ fn render_towers_list(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_stateful_widget(list, area, &mut app.tower_list_state);
 }
 
-fn render_tower_details(f: &mut Frame, app: &App, area: Rect) {
+fn render_tower_details(f: &mut Frame, app: &mut App, area: Rect) {
     let is_selected = matches!(app.selected_panel, SelectedPanel::TowerDetails);
     let border_style = if is_selected {
         Style::default().fg(Color::Green)
@@ -413,7 +515,9 @@ fn render_tower_details(f: &mut Frame, app: &App, area: Rect) {
             if is_editing {
                 spans.push(Span::styled(
                     app.edit_buffer.clone(),
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
                 ));
             } else {
                 spans.push(Span::raw(value));
@@ -423,8 +527,18 @@ fn render_tower_details(f: &mut Frame, app: &App, area: Rect) {
         };
 
         let lines = vec![
-            make_field_line(TowerField::Id, "ID: ".to_string(), tower.id.clone(), Color::Cyan),
-            make_field_line(TowerField::Name, "Name: ".to_string(), tower.name.clone(), Color::Cyan),
+            make_field_line(
+                TowerField::Id,
+                "ID: ".to_string(),
+                tower.id.clone(),
+                Color::Cyan,
+            ),
+            make_field_line(
+                TowerField::Name,
+                "Name: ".to_string(),
+                tower.name.clone(),
+                Color::Cyan,
+            ),
             Line::from(""),
             make_field_line(
                 TowerField::SpritePath,
@@ -547,7 +661,10 @@ fn main() -> io::Result<()> {
 fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
-) -> io::Result<()> {
+) -> io::Result<()>
+where
+    std::io::Error: From<<B as Backend>::Error>,
+{
     loop {
         terminal.draw(|f| ui(f, app))?;
 

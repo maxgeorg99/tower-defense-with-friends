@@ -105,9 +105,7 @@ impl App {
 
         let waves_config =
             WavesConfig::load().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-
-        let picker = Picker::from_query_stdio().unwrap_or(Picker::halfblocks());
-
+        
         let mut app = Self {
             units: units_config.units,
             waves: waves_config.waves,
@@ -121,7 +119,7 @@ impl App {
             selected_spawn_field: SpawnField::UnitType,
             editing: false,
             edit_buffer: String::new(),
-            picker,
+            picker: Picker::from_query_stdio().unwrap_or(Picker::halfblocks()),
             unit_image: None,
         };
 
