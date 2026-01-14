@@ -106,9 +106,7 @@ impl App {
         let waves_config =
             WavesConfig::load().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
-        // Initialize the image picker with iTerm2 protocol
-        let mut picker = Picker::halfblocks();
-        picker.set_protocol_type(ProtocolType::Iterm2);
+        let picker = Picker::from_query_stdio().unwrap_or(Picker::halfblocks());
 
         let mut app = Self {
             units: units_config.units,
