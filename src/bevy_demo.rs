@@ -48,6 +48,7 @@ fn main() {
         ..default()
     }))
     .add_plugins(TiledPlugin::default())
+    .init_state::<AppState>()
     .init_resource::<GameState>()
     .insert_resource(spawner)
     .insert_resource(PathWaypoints {
@@ -73,11 +74,15 @@ fn main() {
             move_projectiles,
             handle_projectile_hits,
             update_health_bars,
-        ),
+        )
+        .run_if(in_state(AppState::InGame))
     )
     .add_systems(Update, (cleanup_dead_enemies, update_ui, check_game_over))
     .add_systems(Update, camera_zoom)
+    .add_systems(OnEnter(AppState::GameOver), setup_game_over_screen)
+    .add_systems(OnExit(AppState::GameOver), cleanup_game_over_screen)
     .add_systems(Update, camera_pan);
+
 
     // Setup file watching for hot-reloading
     #[cfg(feature = "bevy-demo")]
@@ -178,6 +183,12 @@ impl Default for GameState {
         }
     }
 }
+#[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
+enum AppState {
+    #[default]
+    InGame,
+    GameOver,
+}
 
 #[derive(Resource)]
 struct EnemySpawner {
@@ -258,7 +269,7 @@ fn create_path_waypoints() -> Vec<Vec2> {
         (17, 4),  // Move up
         (23, 4),  // Move right
         (23, 11), // Move down
-        (29, 11), // End at castle (right side)
+        (26, 11), // End at castle (right side)
     ];
 
     // Convert tile coordinates to world positions
@@ -926,6 +937,45 @@ fn cleanup_dead_enemies(
     }
 }
 
+fn cleanup_game_over_screen(
+    mut commands: Commands,
+    query: Query<Entity, With<GameOverScreen>>,
+) {
+    for e in &query {
+        commands.entity(e).despawn();
+    }
+}
+
+#[derive(Component)]
+struct GameOverScreen;
+
+fn setup_game_over_screen(mut commands: Commands) {
+    commands.spawn((
+        Node {
+            // Stretch over whole screen
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            flex_direction: FlexDirection::Column,
+            ..default()
+        },
+        BackgroundColor(Color::linear_rgba(0.0, 0.0, 0.0, 0.7)),
+        GameOverScreen,
+    )).with_children(|parent| {
+
+        // GAME OVER text
+        parent.spawn((
+            Text::new("GAME OVER"),
+            TextFont {
+                font_size: 80.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+    });
+}
+
 // === UI UPDATE ===
 
 fn update_ui(game_state: Res<GameState>, mut ui_query: Query<&mut Text, With<GameUI>>) {
@@ -939,9 +989,12 @@ fn update_ui(game_state: Res<GameState>, mut ui_query: Query<&mut Text, With<Gam
 
 // === GAME OVER ===
 
-fn check_game_over(game_state: Res<GameState>) {
+fn check_game_over(
+    game_state: Res<GameState>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
     if game_state.lives <= 0 {
-        info!("Game Over! Final Score: {}", game_state.score);
+        next_state.set(AppState::GameOver);
     }
 }
 

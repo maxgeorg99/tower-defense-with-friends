@@ -10,7 +10,6 @@ pub mod identity_connected_reducer;
 pub mod identity_disconnected_reducer;
 pub mod message_table;
 pub mod message_type;
-pub mod my_user_table;
 pub mod send_message_reducer;
 pub mod set_name_reducer;
 pub mod user_table;
@@ -24,7 +23,6 @@ pub use identity_disconnected_reducer::{
 };
 pub use message_table::*;
 pub use message_type::Message;
-pub use my_user_table::*;
 pub use send_message_reducer::{send_message, set_flags_for_send_message, SendMessageCallbackId};
 pub use set_name_reducer::{set_flags_for_set_name, set_name, SetNameCallbackId};
 pub use user_table::*;
@@ -98,7 +96,6 @@ impl TryFrom<__ws::ReducerCallInfo<__ws::BsatnFormat>> for Reducer {
 #[doc(hidden)]
 pub struct DbUpdate {
     message: __sdk::TableUpdate<Message>,
-    my_user: __sdk::TableUpdate<User>,
     user: __sdk::TableUpdate<User>,
 }
 
@@ -111,9 +108,6 @@ impl TryFrom<__ws::DatabaseUpdate<__ws::BsatnFormat>> for DbUpdate {
                 "message" => db_update
                     .message
                     .append(message_table::parse_table_update(table_update)?),
-                "my_user" => db_update
-                    .my_user
-                    .append(my_user_table::parse_table_update(table_update)?),
                 "user" => db_update
                     .user
                     .append(user_table::parse_table_update(table_update)?),
@@ -144,7 +138,6 @@ impl __sdk::DbUpdate for DbUpdate {
         let mut diff = AppliedDiff::default();
 
         diff.message = cache.apply_diff_to_table::<Message>("message", &self.message);
-        diff.my_user = cache.apply_diff_to_table::<User>("my_user", &self.my_user);
         diff.user = cache
             .apply_diff_to_table::<User>("user", &self.user)
             .with_updates_by_pk(|row| &row.identity);
@@ -158,7 +151,6 @@ impl __sdk::DbUpdate for DbUpdate {
 #[doc(hidden)]
 pub struct AppliedDiff<'r> {
     message: __sdk::TableAppliedDiff<'r, Message>,
-    my_user: __sdk::TableAppliedDiff<'r, User>,
     user: __sdk::TableAppliedDiff<'r, User>,
     __unused: std::marker::PhantomData<&'r ()>,
 }
@@ -174,7 +166,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks: &mut __sdk::DbCallbacks<RemoteModule>,
     ) {
         callbacks.invoke_table_row_callbacks::<Message>("message", &self.message, event);
-        callbacks.invoke_table_row_callbacks::<User>("my_user", &self.my_user, event);
         callbacks.invoke_table_row_callbacks::<User>("user", &self.user, event);
     }
 }
@@ -896,7 +887,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
 
     fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         message_table::register_table(client_cache);
-        my_user_table::register_table(client_cache);
         user_table::register_table(client_cache);
     }
 }
