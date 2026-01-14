@@ -14,6 +14,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
+use ratatui_image::{picker::{Picker, ProtocolType}, protocol::StatefulProtocol, StatefulImage};
 use std::{
     fs,
     io::{self, stdout},
@@ -92,6 +93,8 @@ struct App {
     selected_spawn_field: SpawnField,
     editing: bool,
     edit_buffer: String,
+    picker: Picker,
+    unit_image: Option<StatefulProtocol>,
 }
 
 impl App {
@@ -102,6 +105,10 @@ impl App {
 
         let waves_config =
             WavesConfig::load().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        // Initialize the image picker with iTerm2 protocol
+        let mut picker = Picker::halfblocks();
+        picker.set_protocol_type(ProtocolType::Iterm2);
 
         let mut app = Self {
             units: units_config.units,
@@ -116,6 +123,8 @@ impl App {
             selected_spawn_field: SpawnField::UnitType,
             editing: false,
             edit_buffer: String::new(),
+            picker,
+            unit_image: None,
         };
 
         if !app.waves.is_empty() {
@@ -125,6 +134,7 @@ impl App {
 
         if !app.units.is_empty() {
             app.unit_list_state.select(Some(0));
+            app.load_selected_unit_image();
         }
 
         Ok(app)
@@ -172,6 +182,7 @@ impl App {
             None => 0,
         };
         self.unit_list_state.select(Some(i));
+        self.load_selected_unit_image();
     }
 
     fn previous_unit(&mut self) {
@@ -186,6 +197,26 @@ impl App {
             None => 0,
         };
         self.unit_list_state.select(Some(i));
+        self.load_selected_unit_image();
+    }
+
+    fn load_selected_unit_image(&mut self) {
+        if let Some(idx) = self.unit_list_state.selected() {
+            if let Some(unit) = self.units.get(idx) {
+                let sprite_path = format!("assets/{}", unit.sprite_path);
+                if let Ok(dyn_img) = image::ImageReader::open(&sprite_path)
+                    .and_then(|r| r.decode().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)))
+                {
+                    // Crop to first frame (assuming square frames based on height)
+                    let height = dyn_img.height();
+                    let frame_width = height; // Assume square frames
+                    let cropped = dyn_img.crop_imm(0, 0, frame_width, height);
+                    self.unit_image = Some(self.picker.new_resize_protocol(cropped));
+                } else {
+                    self.unit_image = None;
+                }
+            }
+        }
     }
 
     fn save(&mut self) -> io::Result<()> {
@@ -472,8 +503,17 @@ fn ui(f: &mut Frame, app: &mut App) {
     // Render wave details
     render_wave_details(f, app, main_chunks[1]);
 
+    // Split units panel into image preview (top) and units list (bottom)
+    let units_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(12), Constraint::Min(0)])
+        .split(main_chunks[2]);
+
+    // Render unit image preview
+    render_unit_image(f, app, units_chunks[0]);
+
     // Render units list
-    render_units_list(f, app, main_chunks[2]);
+    render_units_list(f, app, units_chunks[1]);
 
     // Render status bar
     render_status_bar(f, app, chunks[1]);
@@ -697,6 +737,32 @@ fn render_wave_details(f: &mut Frame, app: &App, area: Rect) {
     }
 }
 
+fn render_unit_image(f: &mut Frame, app: &mut App, area: Rect) {
+    let is_selected = matches!(app.selected_panel, SelectedPanel::Units);
+    let border_style = if is_selected {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default()
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Unit Preview")
+        .border_style(border_style);
+
+    let inner_area = block.inner(area);
+    f.render_widget(block, area);
+
+    if let Some(ref mut image_protocol) = app.unit_image {
+        let image_widget = StatefulImage::default();
+        f.render_stateful_widget(image_widget, inner_area, image_protocol);
+    } else {
+        let placeholder = Paragraph::new("No image available")
+            .style(Style::default().fg(Color::DarkGray));
+        f.render_widget(placeholder, inner_area);
+    }
+}
+
 fn render_units_list(f: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = app
         .units
@@ -815,9 +881,14 @@ fn main() -> io::Result<()> {
 fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
-) -> io::Result<()> {
+) -> io::Result<()>
+where
+    B::Error: std::fmt::Debug,
+{
     loop {
-        terminal.draw(|f| ui(f, app))?;
+        terminal
+            .draw(|f| ui(f, app))
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{:?}", e)))?;
 
         if let Event::Key(key) = event::read()? {
             // Handle editing mode separately
