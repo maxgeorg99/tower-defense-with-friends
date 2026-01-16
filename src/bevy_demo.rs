@@ -60,7 +60,8 @@ fn main() {
         active: false,
         position: Vec2::ZERO,
     })
-    .add_systems(Startup, setup)
+    .insert_resource(FogOfWar::new())
+    .add_systems(Startup, (setup, setup_fog_of_war).chain())
     .add_systems(
         Update,
         (
@@ -77,7 +78,7 @@ fn main() {
         )
         .run_if(in_state(AppState::InGame))
     )
-    .add_systems(Update, (cleanup_dead_enemies, update_ui, check_game_over))
+    .add_systems(Update, (cleanup_dead_enemies, update_ui, check_game_over, update_fog_visibility))
     .add_systems(Update, camera_zoom)
     .add_systems(OnEnter(AppState::GameOver), setup_game_over_screen)
     .add_systems(OnExit(AppState::GameOver), cleanup_game_over_screen)
@@ -163,6 +164,12 @@ struct TowerWheelOption {
     tower_type_id: String,
 }
 
+#[derive(Component)]
+struct FogTile {
+    tile_x: i32,
+    tile_y: i32,
+}
+
 // === RESOURCES ===
 
 #[derive(Resource)]
@@ -226,6 +233,43 @@ struct TowerWheelState {
     position: Vec2,
 }
 
+#[derive(Resource)]
+struct FogOfWar {
+    /// 2D grid of explored tiles (true = explored, false = fog)
+    explored: Vec<Vec<bool>>,
+}
+
+impl FogOfWar {
+    fn new() -> Self {
+        // Initialize all tiles as unexplored (fog)
+        Self {
+            explored: vec![vec![false; MAP_WIDTH as usize]; MAP_HEIGHT as usize],
+        }
+    }
+
+    fn is_explored(&self, tile_x: i32, tile_y: i32) -> bool {
+        if tile_x < 0 || tile_x >= MAP_WIDTH || tile_y < 0 || tile_y >= MAP_HEIGHT {
+            return false;
+        }
+        self.explored[tile_y as usize][tile_x as usize]
+    }
+
+    fn set_explored(&mut self, tile_x: i32, tile_y: i32, explored: bool) {
+        if tile_x >= 0 && tile_x < MAP_WIDTH && tile_y >= 0 && tile_y < MAP_HEIGHT {
+            self.explored[tile_y as usize][tile_x as usize] = explored;
+        }
+    }
+
+    /// Explore a rectangular area around a center tile
+    fn explore_rect(&mut self, center_x: i32, center_y: i32, radius: i32) {
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                self.set_explored(center_x + dx, center_y + dy, true);
+            }
+        }
+    }
+}
+
 impl EnemySpawner {
     fn from_wave_config(wave: &Wave) -> Self {
         let total_enemies: i32 = wave.spawns.iter().map(|s| s.count).sum();
@@ -252,6 +296,10 @@ const CASTLE_SIZE: Vec2 = Vec2::new(320.0, 256.0);
 // Map dimensions
 const MAP_WIDTH: i32 = 30;
 const MAP_HEIGHT: i32 = 20;
+
+// Fog of war
+const EXPLORE_COST: i32 = 50;
+const EXPLORE_RADIUS: i32 = 4;
 
 // === PATH WAYPOINTS ===
 
@@ -286,6 +334,13 @@ fn tile_to_world(tile_x: i32, tile_y: i32) -> Vec2 {
     let world_y =
         -320.0 + ((MAP_HEIGHT - 1 - tile_y) as f32 * SCALED_TILE_SIZE) + (SCALED_TILE_SIZE / 2.0);
     Vec2::new(world_x, world_y)
+}
+
+fn world_to_tile(world_pos: Vec2) -> (i32, i32) {
+    // Convert world coordinates to tile coordinates
+    let tile_x = ((world_pos.x + 480.0) / SCALED_TILE_SIZE).floor() as i32;
+    let tile_y = MAP_HEIGHT - 1 - ((world_pos.y + 320.0) / SCALED_TILE_SIZE).floor() as i32;
+    (tile_x, tile_y)
 }
 
 // === SETUP ===
@@ -325,6 +380,62 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Castle,
     ));
 
+}
+
+// === FOG OF WAR ===
+
+fn setup_fog_of_war(mut commands: Commands, asset_server: Res<AssetServer>, mut fog: ResMut<FogOfWar>) {
+    // Castle is at world position (400.0, 0.0), which is approximately tile (27, 10)
+    // Explore a larger area (radius 4) around the castle
+    const CASTLE_TILE_X: i32 = 27;
+    const CASTLE_TILE_Y: i32 = 10;
+    const EXPLORE_RADIUS: i32 = 8;
+
+    fog.explore_rect(CASTLE_TILE_X, CASTLE_TILE_Y, EXPLORE_RADIUS);
+
+    // Load the shadow texture for fog
+    let fog_texture = asset_server.load("Terrain/Shadow.png");
+
+    // Shadow.png is 16x16, scale it to match tile size (32x32)
+    let fog_scale = SCALED_TILE_SIZE / 16.0;
+
+    // Spawn fog tiles for all map tiles using the shadow texture
+    for tile_y in 0..MAP_HEIGHT {
+        for tile_x in 0..MAP_WIDTH {
+            let world_pos = tile_to_world(tile_x, tile_y);
+            let is_explored = fog.is_explored(tile_x, tile_y);
+
+            commands.spawn((
+                Sprite::from_image(fog_texture.clone()),
+                Transform::from_xyz(world_pos.x, world_pos.y, 5.0)
+                    .with_scale(Vec3::splat(fog_scale)),
+                Visibility::from(if is_explored {
+                    Visibility::Hidden
+                } else {
+                    Visibility::Visible
+                }),
+                FogTile { tile_x, tile_y },
+            ));
+        }
+    }
+}
+
+fn update_fog_visibility(
+    fog: Res<FogOfWar>,
+    mut fog_tiles: Query<(&FogTile, &mut Visibility)>,
+) {
+    if !fog.is_changed() {
+        return;
+    }
+
+    for (fog_tile, mut visibility) in fog_tiles.iter_mut() {
+        let is_explored = fog.is_explored(fog_tile.tile_x, fog_tile.tile_y);
+        *visibility = if is_explored {
+            Visibility::Hidden
+        } else {
+            Visibility::Visible
+        };
+    }
 }
 
 fn spawn_tower(
@@ -541,6 +652,7 @@ fn show_tower_wheel_menu(
     camera: Query<(&Camera, &GlobalTransform)>,
     mut wheel_state: ResMut<TowerWheelState>,
     tower_configs: Res<TowerConfigs>,
+    fog: Res<FogOfWar>,
     existing_menus: Query<Entity, With<TowerWheelMenu>>,
 ) {
     if mouse_button.just_pressed(MouseButton::Left) && !wheel_state.active {
@@ -564,71 +676,121 @@ fn show_tower_wheel_menu(
                 wheel_state.active = true;
                 wheel_state.position = world_pos;
 
-                // Create wheel menu
-                let num_towers = tower_configs.towers.len();
-                let radius = 80.0; // Distance from center to each option
+                // Check if clicked tile is in fog
+                let (tile_x, tile_y) = world_to_tile(world_pos);
+                let is_in_fog = !fog.is_explored(tile_x, tile_y);
 
-                for (i, tower_type) in tower_configs.towers.iter().enumerate() {
-                    let angle = (i as f32 / num_towers as f32) * std::f32::consts::TAU;
-                    let offset_x = angle.cos() * radius;
-                    let offset_y = angle.sin() * radius;
-
-                    // Create background circle
+                if is_in_fog {
+                    // Show explore option only
                     let circle_entity = commands
                         .spawn((
                             Sprite {
-                                color: Color::srgba(0.2, 0.2, 0.8, 0.7),
-                                custom_size: Some(Vec2::splat(60.0)),
+                                color: Color::srgba(0.1, 0.5, 0.1, 0.8),
+                                custom_size: Some(Vec2::splat(70.0)),
                                 ..default()
                             },
-                            Transform::from_xyz(world_pos.x + offset_x, world_pos.y + offset_y, 10.0),
+                            Transform::from_xyz(world_pos.x, world_pos.y - 60.0, 10.0),
                             TowerWheelMenu,
                             TowerWheelOption {
-                                tower_type_id: tower_type.id.clone(),
+                                tower_type_id: "_explore".to_string(),
                             },
                         ))
                         .id();
 
-                    // Add tower sprite on top
-                    let scale = 40.0 / TOWER_SIZE.x.max(TOWER_SIZE.y);
-                    let sprite_entity = commands
-                        .spawn((
-                            Sprite::from_image(asset_server.load(&tower_type.sprite_path)),
-                            Transform::from_xyz(0.0, 0.0, 0.1).with_scale(Vec3::splat(scale)),
-                        ))
-                        .id();
-
-                    commands.entity(circle_entity).add_child(sprite_entity);
-
-                    // Add tower name below
+                    // Add explore text
                     let name_entity = commands
                         .spawn((
-                            Text2d::new(&tower_type.name),
-                            TextFont {
-                                font_size: 12.0,
-                                ..default()
-                            },
-                            TextColor(Color::srgb(1.0, 1.0, 1.0)),
-                            Transform::from_xyz(0.0, -40.0, 0.1),
-                            TowerWheelMenu,
-                        ))
-                        .id();
-                    commands.entity(circle_entity).add_child(name_entity);
-
-                    // Add cost label above sprite
-                    let cost_entity = commands
-                        .spawn((
-                            Text2d::new(format!("{}g", tower_type.cost)),
+                            Text2d::new("Explore"),
                             TextFont {
                                 font_size: 14.0,
                                 ..default()
                             },
+                            TextColor(Color::srgb(1.0, 1.0, 1.0)),
+                            Transform::from_xyz(0.0, 0.0, 0.1),
+                        ))
+                        .id();
+                    commands.entity(circle_entity).add_child(name_entity);
+
+                    // Add cost label
+                    let cost_entity = commands
+                        .spawn((
+                            Text2d::new(format!("{}g", EXPLORE_COST)),
+                            TextFont {
+                                font_size: 12.0,
+                                ..default()
+                            },
                             TextColor(Color::srgb(1.0, 1.0, 0.0)),
-                            Transform::from_xyz(0.0, 35.0, 0.1),
-                            TowerWheelMenu,
+                            Transform::from_xyz(0.0, -20.0, 0.1),
                         ))
                         .id();
                     commands.entity(circle_entity).add_child(cost_entity);
+                } else {
+                    // Show tower options (existing code)
+                    let num_towers = tower_configs.towers.len();
+                    let radius = 80.0; // Distance from center to each option
+
+                    for (i, tower_type) in tower_configs.towers.iter().enumerate() {
+                        let angle = (i as f32 / num_towers as f32) * std::f32::consts::TAU;
+                        let offset_x = angle.cos() * radius;
+                        let offset_y = angle.sin() * radius;
+
+                        // Create background circle
+                        let circle_entity = commands
+                            .spawn((
+                                Sprite {
+                                    color: Color::srgba(0.2, 0.2, 0.8, 0.7),
+                                    custom_size: Some(Vec2::splat(60.0)),
+                                    ..default()
+                                },
+                                Transform::from_xyz(world_pos.x + offset_x, world_pos.y + offset_y, 10.0),
+                                TowerWheelMenu,
+                                TowerWheelOption {
+                                    tower_type_id: tower_type.id.clone(),
+                                },
+                            ))
+                            .id();
+
+                        // Add tower sprite on top
+                        let scale = 40.0 / TOWER_SIZE.x.max(TOWER_SIZE.y);
+                        let sprite_entity = commands
+                            .spawn((
+                                Sprite::from_image(asset_server.load(&tower_type.sprite_path)),
+                                Transform::from_xyz(0.0, 0.0, 0.1).with_scale(Vec3::splat(scale)),
+                            ))
+                            .id();
+
+                        commands.entity(circle_entity).add_child(sprite_entity);
+
+                        // Add tower name below
+                        let name_entity = commands
+                            .spawn((
+                                Text2d::new(&tower_type.name),
+                                TextFont {
+                                    font_size: 12.0,
+                                    ..default()
+                                },
+                                TextColor(Color::srgb(1.0, 1.0, 1.0)),
+                                Transform::from_xyz(0.0, -40.0, 0.1),
+                                TowerWheelMenu,
+                            ))
+                            .id();
+                        commands.entity(circle_entity).add_child(name_entity);
+
+                        // Add cost label above sprite
+                        let cost_entity = commands
+                            .spawn((
+                                Text2d::new(format!("{}g", tower_type.cost)),
+                                TextFont {
+                                    font_size: 14.0,
+                                    ..default()
+                                },
+                                TextColor(Color::srgb(1.0, 1.0, 0.0)),
+                                Transform::from_xyz(0.0, 35.0, 0.1),
+                                TowerWheelMenu,
+                            ))
+                            .id();
+                        commands.entity(circle_entity).add_child(cost_entity);
+                    }
                 }
 
                 // Add center indicator
@@ -676,6 +838,7 @@ fn handle_tower_selection(
     mut wheel_state: ResMut<TowerWheelState>,
     mut game_state: ResMut<GameState>,
     tower_configs: Res<TowerConfigs>,
+    mut fog: ResMut<FogOfWar>,
     menu_options: Query<(&Transform, &TowerWheelOption), With<TowerWheelMenu>>,
     menu_entities: Query<Entity, With<TowerWheelMenu>>,
 ) {
@@ -704,21 +867,32 @@ fn handle_tower_selection(
                     }
                 }
 
-                // If an option was selected, try to place that tower
+                // If an option was selected
                 if let Some((option, _)) = closest_option {
-                    if let Some(tower_type) = tower_configs
+                    // Handle explore option
+                    if option.tower_type_id == "_explore" {
+                        if game_state.gold >= EXPLORE_COST {
+                            let (tile_x, tile_y) = world_to_tile(wheel_state.position);
+                            fog.explore_rect(tile_x, tile_y, EXPLORE_RADIUS);
+                            game_state.gold -= EXPLORE_COST;
+                        }
+                    } else if let Some(tower_type) = tower_configs
                         .towers
                         .iter()
                         .find(|t| t.id == option.tower_type_id)
                     {
-                        if game_state.gold >= tower_type.cost {
-                            // Snap to tile grid
-                            let snapped_x =
-                                (wheel_state.position.x / SCALED_TILE_SIZE).round() * SCALED_TILE_SIZE;
-                            let snapped_y =
-                                (wheel_state.position.y / SCALED_TILE_SIZE).round() * SCALED_TILE_SIZE;
-                            let snapped_pos = Vec3::new(snapped_x, snapped_y, 1.0);
+                        // Snap to tile grid
+                        let snapped_x =
+                            (wheel_state.position.x / SCALED_TILE_SIZE).round() * SCALED_TILE_SIZE;
+                        let snapped_y =
+                            (wheel_state.position.y / SCALED_TILE_SIZE).round() * SCALED_TILE_SIZE;
+                        let snapped_pos = Vec3::new(snapped_x, snapped_y, 1.0);
 
+                        // Check if tile is explored (not in fog)
+                        let (tile_x, tile_y) = world_to_tile(Vec2::new(snapped_x, snapped_y));
+                        let is_explored = fog.is_explored(tile_x, tile_y);
+
+                        if game_state.gold >= tower_type.cost && is_explored {
                             spawn_tower(&mut commands, &asset_server, snapped_pos, tower_type);
                             game_state.gold -= tower_type.cost;
                         }
