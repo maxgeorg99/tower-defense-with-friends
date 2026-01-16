@@ -1,15 +1,35 @@
 use bevy::prelude::*;
 use bevy_ecs_tiled::prelude::*;
+use bevy_spacetimedb::connect_with_token;
 
 use crate::components::{Castle, FogTile, GameUI};
 use crate::constants::{CASTLE_SIZE, MAP_HEIGHT, MAP_SCALE, MAP_WIDTH, SCALED_TILE_SIZE};
 use crate::map::tile_to_world;
-use crate::resources::FogOfWar;
+use crate::resources::{FogOfWar, StdbConfig};
 
-pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // Spawn a 2D camera
+/// Setup camera (runs on startup, needed for all states)
+pub fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2d);
+}
 
+/// Connect to SpacetimeDB using the delayed connection feature
+/// This runs when entering InGame state and establishes the connection with optional token
+pub fn connect_to_spacetimedb(world: &mut World) {
+    let token = world
+        .get_resource::<StdbConfig>()
+        .and_then(|config| config.token.clone());
+
+    if token.is_some() {
+        info!("Connecting to SpacetimeDB with auth token...");
+    } else {
+        info!("Connecting to SpacetimeDB anonymously...");
+    }
+
+    connect_with_token(world, token);
+}
+
+/// Setup game elements (runs when entering InGame state)
+pub fn setup_game(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Load and spawn the tilemap
     commands.spawn((
         TiledMap(asset_server.load("map.tmx")),
@@ -40,6 +60,11 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Transform::from_xyz(400.0, 0.0, 1.0).with_scale(Vec3::splat(castle_scale)),
         Castle,
     ));
+}
+
+/// Legacy alias for setup_game (deprecated)
+pub fn setup(commands: Commands, asset_server: Res<AssetServer>) {
+    setup_game(commands, asset_server);
 }
 
 pub fn setup_fog_of_war(

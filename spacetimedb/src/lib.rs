@@ -1,10 +1,14 @@
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp, ViewContext};
 
+/// Your SpacetimeAuth OIDC client ID - set this to match your project
+const OIDC_CLIENT_ID: &str = "client_XXXXXXXXXXXXXXXXXXXXXX";
+
 #[spacetimedb::table(name = user, public)]
 pub struct User {
     #[primary_key]
     identity: Identity,
     name: Option<String>,
+    email: Option<String>,
     online: bool,
 }
 
@@ -72,19 +76,39 @@ pub fn init(_ctx: &ReducerContext) {}
 
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
+    // Extract auth info from JWT if present
+    let auth_ctx = ctx.sender_auth();
+    let (name, email) = if let Some(jwt) = auth_ctx.jwt() {
+        // Use subject as fallback name
+        let name = jwt.subject().to_string();
+
+        log::info!(
+            "User connected with JWT - sub: {}, iss: {}",
+            jwt.subject(),
+            jwt.issuer()
+        );
+
+        (Some(name), None::<String>)
+    } else {
+        log::info!("User connected anonymously: {}", ctx.sender);
+        (None, None)
+    };
+
     if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
-        // If this is a returning user, i.e. we already have a `User` with this `Identity`,
-        // set `online: true`, but leave `name` and `identity` unchanged.
+        // Returning user - update online status, preserve existing name if set
         ctx.db.user().identity().update(User {
             online: true,
+            // Keep existing name if already set, otherwise use JWT name
+            name: user.name.or(name),
+            email: user.email.or(email),
             ..user
         });
     } else {
-        // If this is a new user, create a `User` row for the `Identity`,
-        // which is online, but hasn't set a name.
+        // New user
         ctx.db.user().insert(User {
-            name: None,
             identity: ctx.sender,
+            name,
+            email,
             online: true,
         });
     }

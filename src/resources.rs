@@ -10,6 +10,14 @@ use std::sync::{Arc, Mutex};
 use crate::config::{TowerType, UnitType, Wave};
 use crate::constants::{MAP_HEIGHT, MAP_WIDTH};
 
+/// SpacetimeDB connection configuration (for deferred connection)
+#[derive(Resource, Clone)]
+pub struct StdbConfig {
+    pub uri: String,
+    pub module: String,
+    pub token: Option<String>,
+}
+
 #[derive(Resource)]
 pub struct GameState {
     pub lives: i32,
@@ -31,8 +39,12 @@ impl Default for GameState {
 
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub enum AppState {
+    /// Show login screen (when auth is required)
     #[default]
+    Login,
+    /// Main game
     InGame,
+    /// Game over screen
     GameOver,
 }
 
