@@ -36,7 +36,7 @@ description = "A holy tower, very effective vs. demons!"
 
 [[towers]]
 id = "tower_4"
-name = "New Tower 4"
+name = "House"
 sprite_path = "Decorations/Buildings/Blue Buildings/House1.png"
 cost = 50
 range = 256.0
