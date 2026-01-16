@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::components::{Enemy, Tower, TowerWheelMenu, TowerWheelOption, Projectile};
 use crate::config::TowerType;
 use crate::constants::{ARROW_SIZE, EXPLORE_COST, EXPLORE_RADIUS, SCALED_TILE_SIZE, TOWER_SIZE};
-use crate::helpers::world_to_tile;
+use crate::map::world_to_tile;
 use crate::resources::{FogOfWar, GameState, TowerConfigs, TowerWheelState};
 
 pub fn spawn_tower(

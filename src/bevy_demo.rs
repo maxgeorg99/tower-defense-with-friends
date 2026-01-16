@@ -1,7 +1,10 @@
+#[cfg(feature = "bevy-demo")]
+mod module_bindings;
+
 mod components;
 mod config;
 mod constants;
-mod helpers;
+mod map;
 mod resources;
 mod systems;
 
@@ -9,6 +12,9 @@ use config::{TowersConfig, UnitsConfig, WavesConfig};
 
 use bevy::prelude::*;
 use bevy_ecs_tiled::prelude::*;
+use bevy_spacetimedb::*;
+use module_bindings::user_table::UserTableAccess;
+use module_bindings::{DbConnection, RemoteModule, RemoteTables};
 
 #[cfg(feature = "bevy-demo")]
 use notify::{RecursiveMode, Watcher};
@@ -19,7 +25,7 @@ use std::sync::mpsc::channel;
 #[cfg(feature = "bevy-demo")]
 use std::sync::{Arc, Mutex};
 
-use helpers::create_path_waypoints;
+use map::create_path_waypoints;
 use resources::*;
 use systems::*;
 
@@ -60,6 +66,14 @@ fn main() {
         ..default()
     }))
     .add_plugins(TiledPlugin::default())
+    // SpacetimeDB plugin
+    .add_plugins(
+        StdbPlugin::<DbConnection, RemoteModule>::default()
+            .with_uri("http://127.0.0.1:3000")
+            .with_module_name("rust")
+            .with_run_fn(DbConnection::run_threaded)
+            .add_table(|tables: &RemoteTables| tables.user()),
+    )
     .init_state::<AppState>()
     .init_resource::<GameState>()
     .insert_resource(spawner)
@@ -73,7 +87,20 @@ fn main() {
         position: Vec2::ZERO,
     })
     .insert_resource(FogOfWar::new())
-    .add_systems(Startup, (setup, setup_fog_of_war).chain())
+    .add_systems(Startup, (setup, setup_fog_of_war, setup_online_users_ui).chain())
+    // SpacetimeDB connection handling systems
+    .add_systems(
+        Update,
+        (
+            on_connected,
+            on_disconnected,
+            on_connection_error,
+            on_user_inserted,
+            on_user_updated,
+            on_user_deleted,
+            update_online_users_ui,
+        ),
+    )
     .add_systems(
         Update,
         (

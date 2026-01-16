@@ -651,10 +651,6 @@ fn main() -> io::Result<()> {
     )?;
     terminal.show_cursor()?;
 
-    if let Err(err) = res {
-        println!("Error: {err:?}");
-    }
-
     Ok(())
 }
 

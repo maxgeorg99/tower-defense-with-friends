@@ -7,10 +7,6 @@ edition = "2024"
 exclude = ["spacetimedb"]
 
 [[bin]]
-name = "chat-tui"
-path = "src/main.rs"
-
-[[bin]]
 name = "bevy-demo"
 path = "src/bevy_demo.rs"
 required-features = ["bevy-demo"]
@@ -24,26 +20,23 @@ name = "tower-manager"
 path = "src/tower_manager.rs"
 
 [dependencies]
-spacetimedb-sdk = { version = "1.8.*" }
 ratatui = "0.30.0"
 ratatui-image = "10.0.2"
-chafa = "0.1.1"
 image = "0.25.9"
 crossterm = "0.29.0"
-subsecond = "0.7"
 dioxus-devtools = { version = "0.7", optional = true }
 toml = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 
 # Bevy demo dependencies
 bevy = { version = "0.17", optional = true }
-bevy_spacetimedb = { git = "https://github.com/JulienLavocat/bevy_spacetimedb", branch = "onx2-upgrade-0.17.1", optional = true }
-bevy_skein = "0.4.0"
+bevy_spacetimedb = { version = "0.7.2", optional = true }
+spacetimedb-sdk = { version = "1.11", optional = true }
 bevy_ecs_tiled = "0.10.0"
 notify = { version = "7.0", optional = true }
 
 [features]
 default = []
 devtools = ["dioxus-devtools"]
-bevy-demo = ["bevy", "bevy_spacetimedb", "dioxus-devtools", "notify"]
+bevy-demo = ["bevy", "bevy_spacetimedb", "spacetimedb-sdk", "dioxus-devtools", "notify"]
 bevy-hotpatch = ["bevy-demo", "bevy/hotpatching"]

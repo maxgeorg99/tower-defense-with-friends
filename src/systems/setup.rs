@@ -3,7 +3,7 @@ use bevy_ecs_tiled::prelude::*;
 
 use crate::components::{Castle, FogTile, GameUI};
 use crate::constants::{CASTLE_SIZE, MAP_HEIGHT, MAP_SCALE, MAP_WIDTH, SCALED_TILE_SIZE};
-use crate::helpers::tile_to_world;
+use crate::map::tile_to_world;
 use crate::resources::FogOfWar;
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
