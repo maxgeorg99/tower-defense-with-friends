@@ -323,13 +323,69 @@ fn get_success_html() -> String {
             backdrop-filter: blur(10px);
         }
         h1 { margin: 0 0 20px 0; }
+        .countdown {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .close-button {
+            margin-top: 20px;
+            padding: 12px 24px;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .close-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Authentication Successful!</h1>
         <p>You can close this window and return to the game.</p>
+        <div class="countdown" id="countdown">3</div>
+        <button class="close-button" onclick="window.close()">Close Window Now</button>
+        <p style="font-size: 12px; margin-top: 20px; opacity: 0.7;">
+            Press Ctrl+W (Cmd+W on Mac) to close this tab
+        </p>
     </div>
+    <script>
+        // Try to close automatically
+        let count = 3;
+        const countdownEl = document.getElementById('countdown');
+
+        const timer = setInterval(() => {
+            count--;
+            countdownEl.textContent = count;
+
+            if (count <= 0) {
+                clearInterval(timer);
+                // Attempt to close (works if opened via window.open)
+                window.close();
+
+                // If still open after 500ms, show fallback message
+                setTimeout(() => {
+                    countdownEl.textContent = '👆';
+                    document.querySelector('h1').textContent =
+                        'Please close this tab manually';
+                }, 500);
+            }
+        }, 1000);
+
+        // Keyboard shortcut helper
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+                e.preventDefault();
+                window.close();
+            }
+        });
+    </script>
 </body>
 </html>"#
         .to_string()
