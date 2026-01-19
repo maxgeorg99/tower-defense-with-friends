@@ -60,7 +60,7 @@ pub struct AuthState {
 /// User profile from ID token
 #[derive(Clone, Debug, Default)]
 pub struct UserProfile {
-    pub sub: String,
+    pub name: String,
     pub preferred_username: Option<String>,
     pub email: Option<String>,
 }
@@ -289,7 +289,7 @@ fn decode_jwt_payload(jwt: &str) -> Option<UserProfile> {
     let json: serde_json::Value = serde_json::from_slice(&payload).ok()?;
 
     Some(UserProfile {
-        sub: json["sub"].as_str().unwrap_or_default().to_string(),
+        name: json["name"].as_str().unwrap_or_default().to_string(),
         preferred_username: json["preferred_username"].as_str().map(|s| s.to_string()),
         email: json["email"].as_str().map(|s| s.to_string()),
     })
@@ -327,7 +327,7 @@ fn get_success_html() -> String {
 </head>
 <body>
     <div class="container">
-        <h1>✅ Authentication Successful!</h1>
+        <h1>Authentication Successful!</h1>
         <p>You can close this window and return to the game.</p>
     </div>
 </body>
@@ -615,7 +615,7 @@ pub fn check_auth_and_connect(
                         if let Some(profile) = decode_jwt_payload(id_token) {
                             info!(
                                 "Logged in as: {}",
-                                profile.preferred_username.as_deref().unwrap_or(&profile.sub)
+                                profile.preferred_username.as_deref().unwrap_or(&profile.name)
                             );
                             auth_state.user_profile = Some(profile);
                         }

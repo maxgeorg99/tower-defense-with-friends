@@ -17,20 +17,20 @@ publish-local:
 
 # Publish to maincloud
 publish-maincloud:
-    spacetime publish {{MODULE_NAME}} --server maincloud --project-path spacetimedb
+    spacetime publish {{MODULE_NAME}} --server maincloud --project-path spacetimedb --delete-data
 
 # Build + generate + publish locally
 deploy: generate publish-local
 
 # Run SpacetimeDB dev server
 dev:
-    spacetime dev --project-path spacetimedb
+    spacetime dev
 
 # === Client ===
 
 # Run game connected to local SpacetimeDB
 bevy:
-    SPACETIMEDB_URI="http://127.0.0.1:3000" SPACETIMEDB_MODULE={{MODULE_NAME}} cargo run --features bevy-demo --bin bevy-demo
+    SPACETIMEDB_URI="http://127.0.0.1:3000" SPACETIMEDB_MODULE={{MODULE_NAME}} SPACETIMEDB_CLIENT_ID={{AUTH_CLIENT_ID}} SPACETIMEDB_REQUIRE_AUTH=1 cargo run --features bevy-demo --bin bevy-demo
 
 # Run game connected to maincloud (with login screen)
 bevy-live:

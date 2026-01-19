@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use bevy_ecs_tiled::prelude::*;
-use bevy_spacetimedb::connect_with_token;
-
+use bevy_spacetimedb::*;
 use crate::components::{Castle, FogTile, GameUI};
 use crate::constants::{CASTLE_SIZE, MAP_HEIGHT, MAP_SCALE, MAP_WIDTH, SCALED_TILE_SIZE};
 use crate::map::tile_to_world;
+use crate::module_bindings::{DbConnection, RemoteModule};
 use crate::resources::{FogOfWar, StdbConfig};
 
 /// Setup camera (runs on startup, needed for all states)
@@ -21,11 +21,11 @@ pub fn connect_to_spacetimedb(world: &mut World) {
 
     if token.is_some() {
         info!("Connecting to SpacetimeDB with auth token...");
+        connect_with_token::<DbConnection, RemoteModule>(world, token);
     } else {
         info!("Connecting to SpacetimeDB anonymously...");
     }
 
-    connect_with_token(world, token);
 }
 
 /// Setup game elements (runs when entering InGame state)

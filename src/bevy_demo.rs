@@ -26,7 +26,6 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 #[cfg(feature = "bevy-demo")]
 use std::sync::{Arc, Mutex};
-
 use auth::{
     check_auth_and_connect, cleanup_login_screen, handle_anonymous_button,
     handle_login_button, load_token_from_file, setup_login_screen, update_login_button_colors,

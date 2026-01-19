@@ -1,7 +1,6 @@
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp, ViewContext};
-
-/// Your SpacetimeAuth OIDC client ID - set this to match your project
-const OIDC_CLIENT_ID: &str = "client_XXXXXXXXXXXXXXXXXXXXXX";
+use log::info;
+use spacetimedb::{Identity, JwtClaims, ReducerContext, Table, Timestamp, ViewContext};
+use serde::{Deserialize, Serialize};
 
 #[spacetimedb::table(name = user, public)]
 pub struct User {
@@ -57,9 +56,6 @@ fn validate_message(text: String) -> Result<String, String> {
 
 #[spacetimedb::reducer]
 pub fn send_message(ctx: &ReducerContext, text: String) -> Result<(), String> {
-    // Things to consider:
-    // - Rate-limit messages per-user.
-    // - Reject messages from unnamed user.
     let text = validate_message(text)?;
     log::info!("User {}: {text}", ctx.sender);
     ctx.db.message().insert(Message {
@@ -74,31 +70,65 @@ pub fn send_message(ctx: &ReducerContext, text: String) -> Result<(), String> {
 // Called when the module is initially published
 pub fn init(_ctx: &ReducerContext) {}
 
+#[derive(Debug, Serialize, Deserialize)]
+struct UserProfile {
+    name: Option<String>,
+    given_name: Option<String>,
+    family_name: Option<String>,
+    preferred_username: Option<String>,
+    email: Option<String>,
+    email_verified: Option<bool>,
+    picture: Option<String>,
+}
+
+fn extract_user_profile(jwt: &JwtClaims) -> Option<UserProfile> {
+    let payload = jwt.raw_payload();
+    let json: serde_json::Value = serde_json::from_slice(payload.as_ref()).ok()?;
+
+    info!("{}", json.to_string().as_str());
+    Some(UserProfile {
+        name: json["name"].as_str().map(|s| s.to_string()),
+        given_name: json["given_name"].as_str().map(|s| s.to_string()),
+        family_name: json["family_name"].as_str().map(|s| s.to_string()),
+        preferred_username: json["preferred_username"].as_str().map(|s| s.to_string()),
+        email: json["email"].as_str().map(|s| s.to_string()),
+        email_verified: json["email_verified"].as_bool(),
+        picture: json["picture"].as_str().map(|s| s.to_string()),
+    })
+}
+
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
-    // Extract auth info from JWT if present
     let auth_ctx = ctx.sender_auth();
+
     let (name, email) = if let Some(jwt) = auth_ctx.jwt() {
-        // Use subject as fallback name
-        let name = jwt.subject().to_string();
+        // Extract full profile from JWT
+        if let Some(profile) = extract_user_profile(jwt) {
+            info!(
+                "User connected - name: {:?}, email: {:?}",
+                profile.name,
+                profile.email
+            );
 
-        log::info!(
-            "User connected with JWT - sub: {}, iss: {}",
-            jwt.subject(),
-            jwt.issuer()
-        );
+            // Use the full name, or fallback to given_name
+            let display_name = profile.name
+                .or_else(|| profile.given_name.clone());
 
-        (Some(name), None::<String>)
+            (display_name, profile.email)
+        } else {
+            log::warn!("Failed to parse JWT payload for user: {}", ctx.sender);
+            (None, None)
+        }
     } else {
         log::info!("User connected anonymously: {}", ctx.sender);
         (None, None)
     };
 
     if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
-        // Returning user - update online status, preserve existing name if set
+        // Returning user - update online status
         ctx.db.user().identity().update(User {
             online: true,
-            // Keep existing name if already set, otherwise use JWT name
+            // Keep existing data if already set, otherwise use JWT data
             name: user.name.or(name),
             email: user.email.or(email),
             ..user
