@@ -3,7 +3,7 @@ wave_number = 1
 spawn_interval = 2.0
 
 [[waves.spawns]]
-unit_id = "warrior"
+unit_id = "ogre"
 count = 5
 health_multiplier = 1.0
 
@@ -15,6 +15,21 @@ spawn_interval = 1.7999999523162842
 unit_id = "warrior"
 count = 8
 health_multiplier = 1.2000000476837158
+
+[[waves.spawns]]
+unit_id = "goblin_lancer"
+count = 5
+health_multiplier = 1.0
+
+[[waves.spawns]]
+unit_id = "thief"
+count = 5
+health_multiplier = 1.0
+
+[[waves.spawns]]
+unit_id = "shaman"
+count = 5
+health_multiplier = 1.0
 
 [[waves]]
 wave_number = 3
@@ -60,4 +75,13 @@ spawn_interval = 0.10000000149011612
 [[waves.spawns]]
 unit_id = "warrior"
 count = 5500
+health_multiplier = 1.0
+
+[[waves]]
+wave_number = 7
+spawn_interval = 2.0
+
+[[waves.spawns]]
+unit_id = "warrior"
+count = 5
 health_multiplier = 1.0

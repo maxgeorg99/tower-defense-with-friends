@@ -24,3 +24,147 @@ base_health = 80.0
 base_speed = 40.0
 damage_to_base = 2
 gold_reward = 15
+
+[[units]]
+id = "skull"
+name = "Skull"
+sprite_path = "Enemies/Skull/Skull_Run.png"
+base_health = 70.0
+base_speed = 45.0
+damage_to_base = 2
+gold_reward = 12
+
+[[units]]
+id = "paddle_fish"
+name = "Paddle Fish"
+sprite_path = "Enemies/Paddle Fish/PaddleFish_Run.png"
+base_health = 40.0
+base_speed = 65.0
+damage_to_base = 1
+gold_reward = 9
+
+[[units]]
+id = "harpoon_fish"
+name = "Harpoon Fish"
+sprite_path = "Enemies/Harpoon Fish/HarpoonFish_Run.png"
+base_health = 35.0
+base_speed = 70.0
+damage_to_base = 1
+gold_reward = 10
+
+[[units]]
+id = "goblin_lancer"
+name = "Goblin Lancer"
+sprite_path = "Enemies/Lancer/Lancer_Run.png"
+base_health = 60.0
+base_speed = 55.0
+damage_to_base = 2
+gold_reward = 12
+
+[[units]]
+id = "shaman"
+name = "Shaman"
+sprite_path = "Enemies/Shaman/Shaman_Run.png"
+base_health = 30.0
+base_speed = 50.0
+damage_to_base = 3
+gold_reward = 14
+
+[[units]]
+id = "thief"
+name = "Thief"
+sprite_path = "Enemies/Thief/Thief_Run.png"
+base_health = 25.0
+base_speed = 80.0
+damage_to_base = 1
+gold_reward = 8
+
+[[units]]
+id = "snake"
+name = "Snake"
+sprite_path = "Enemies/Snake/Snake_Run.png"
+base_health = 20.0
+base_speed = 75.0
+damage_to_base = 1
+gold_reward = 7
+
+[[units]]
+id = "turtle"
+name = "Turtle"
+sprite_path = "Enemies/Turtle/Turtle_Walk.png"
+base_health = 120.0
+base_speed = 20.0
+damage_to_base = 1
+gold_reward = 15
+
+[[units]]
+id = "minotaur"
+name = "Minotaur"
+sprite_path = "Enemies/Minotaur/Minotaur_Walk.png"
+base_health = 150.0
+base_speed = 35.0
+damage_to_base = 3
+gold_reward = 20
+
+[[units]]
+id = "gnoll"
+name = "Gnoll"
+sprite_path = "Enemies/Gnoll/Gnoll_Run.png"
+base_health = 45.0
+base_speed = 50.0
+damage_to_base = 1
+gold_reward = 9
+
+[[units]]
+id = "spider"
+name = "Spider"
+sprite_path = "Enemies/Spider/Spider_Run.png"
+base_health = 25.0
+base_speed = 90.0
+damage_to_base = 1
+gold_reward = 8
+
+[[units]]
+id = "panda"
+name = "Panda"
+sprite_path = "Enemies/Panda/Panda_Run.png"
+base_health = 100.0
+base_speed = 45.0
+damage_to_base = 2
+gold_reward = 18
+
+[[units]]
+id = "lizard"
+name = "Lizard"
+sprite_path = "Enemies/Lizard/Lizard_Run.png"
+base_health = 60.0
+base_speed = 40.0
+damage_to_base = 1
+gold_reward = 10
+
+[[units]]
+id = "bear"
+name = "Bear"
+sprite_path = "Enemies/Bear/Bear_Run.png"
+base_health = 140.0
+base_speed = 30.0
+damage_to_base = 3
+gold_reward = 20
+
+[[units]]
+id = "gnome"
+name = "Gnome"
+sprite_path = "Enemies/Gnome/Gnome_Run.png"
+base_health = 25.0
+base_speed = 85.0
+damage_to_base = 1
+gold_reward = 7
+
+[[units]]
+id = "ogre"
+name = "Ogre"
+sprite_path = "Enemies/Troll/Troll_Walk.png"
+base_health = 400.0
+base_speed = 25.0
+damage_to_base = 5
+gold_reward = 50

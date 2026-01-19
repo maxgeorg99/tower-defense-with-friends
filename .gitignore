@@ -4,3 +4,5 @@ target/
 src/module_bindings/
 **/CLAUDE.md
 **/ClaudeInstructions/
+assets/**/*.anim
+assets/**/*.controller

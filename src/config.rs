@@ -9,6 +9,8 @@ pub struct UnitType {
     pub base_speed: f32,
     pub damage_to_base: i32,
     pub gold_reward: i32,
+    pub frame_count: usize,
+    pub frame_size: [u32; 2],
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
