@@ -6,6 +6,8 @@ base_health = 50.0
 base_speed = 50.0
 damage_to_base = 1
 gold_reward = 10
+frame_count = 6
+frame_size = [192, 192]
 
 [[units]]
 id = "archer"
@@ -15,6 +17,8 @@ base_health = 30.0
 base_speed = 60.0
 damage_to_base = 1
 gold_reward = 8
+frame_count = 4
+frame_size = [192, 192]
 
 [[units]]
 id = "lancer"
@@ -24,6 +28,19 @@ base_health = 80.0
 base_speed = 40.0
 damage_to_base = 2
 gold_reward = 15
+frame_count = 6
+frame_size = [192, 192]
+
+[[units]]
+id = "monk"
+name = "Red Monk"
+sprite_path = "Units/Red Units/Monk/Run.png"
+base_health = 80.0
+base_speed = 40.0
+damage_to_base = 3
+gold_reward = 25
+frame_count = 4
+frame_size = [192, 192]
 
 [[units]]
 id = "skull"
@@ -33,6 +50,8 @@ base_health = 70.0
 base_speed = 45.0
 damage_to_base = 2
 gold_reward = 12
+frame_count = 6
+frame_size = [192, 192]
 
 [[units]]
 id = "paddle_fish"
@@ -42,6 +61,8 @@ base_health = 40.0
 base_speed = 65.0
 damage_to_base = 1
 gold_reward = 9
+frame_count = 6
+frame_size = [192, 192]
 
 [[units]]
 id = "harpoon_fish"
@@ -51,6 +72,8 @@ base_health = 35.0
 base_speed = 70.0
 damage_to_base = 1
 gold_reward = 10
+frame_count = 6
+frame_size = [192, 192]
 
 [[units]]
 id = "goblin_lancer"
@@ -60,6 +83,8 @@ base_health = 60.0
 base_speed = 55.0
 damage_to_base = 2
 gold_reward = 12
+frame_count = 6
+frame_size = [192, 192]
 
 [[units]]
 id = "shaman"
@@ -69,6 +94,8 @@ base_health = 30.0
 base_speed = 50.0
 damage_to_base = 3
 gold_reward = 14
+frame_count = 4
+frame_size = [192, 192]
 
 [[units]]
 id = "thief"
@@ -78,6 +105,8 @@ base_health = 25.0
 base_speed = 80.0
 damage_to_base = 1
 gold_reward = 8
+frame_count = 6
+frame_size = [192, 192]
 
 [[units]]
 id = "snake"
@@ -87,6 +116,8 @@ base_health = 20.0
 base_speed = 75.0
 damage_to_base = 1
 gold_reward = 7
+frame_count = 8
+frame_size = [192, 192]
 
 [[units]]
 id = "turtle"
@@ -96,6 +127,8 @@ base_health = 120.0
 base_speed = 20.0
 damage_to_base = 1
 gold_reward = 15
+frame_count = 7
+frame_size = [320, 320]
 
 [[units]]
 id = "minotaur"
@@ -105,6 +138,8 @@ base_health = 150.0
 base_speed = 35.0
 damage_to_base = 3
 gold_reward = 20
+frame_count = 8
+frame_size = [320, 320]
 
 [[units]]
 id = "gnoll"
@@ -114,6 +149,8 @@ base_health = 45.0
 base_speed = 50.0
 damage_to_base = 1
 gold_reward = 9
+frame_count = 8
+frame_size = [192, 192]
 
 [[units]]
 id = "spider"
@@ -123,6 +160,8 @@ base_health = 25.0
 base_speed = 90.0
 damage_to_base = 1
 gold_reward = 8
+frame_count = 5
+frame_size = [192, 192]
 
 [[units]]
 id = "panda"
@@ -132,6 +171,8 @@ base_health = 100.0
 base_speed = 45.0
 damage_to_base = 2
 gold_reward = 18
+frame_count = 6
+frame_size = [256, 256]
 
 [[units]]
 id = "lizard"
@@ -141,6 +182,8 @@ base_health = 60.0
 base_speed = 40.0
 damage_to_base = 1
 gold_reward = 10
+frame_count = 6
+frame_size = [192, 192]
 
 [[units]]
 id = "bear"
@@ -150,6 +193,8 @@ base_health = 140.0
 base_speed = 30.0
 damage_to_base = 3
 gold_reward = 20
+frame_count = 5
+frame_size = [256, 256]
 
 [[units]]
 id = "gnome"
@@ -159,6 +204,8 @@ base_health = 25.0
 base_speed = 85.0
 damage_to_base = 1
 gold_reward = 7
+frame_count = 6
+frame_size = [192, 192]
 
 [[units]]
 id = "ogre"
@@ -168,3 +215,5 @@ base_health = 400.0
 base_speed = 25.0
 damage_to_base = 5
 gold_reward = 50
+frame_count = 10
+frame_size = [384, 384]
