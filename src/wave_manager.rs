@@ -1,8 +1,11 @@
 mod config;
+mod animation;
+
+use animation::Animation;
 use config::{UnitSpawn, UnitType, UnitsConfig, Wave, WavesConfig};
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, poll},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -14,11 +17,12 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
-use ratatui_image::{picker::{Picker, ProtocolType}, protocol::StatefulProtocol, StatefulImage};
+use ratatui_image::{picker::Picker, StatefulImage};
 use std::{
     fs,
     io::{self, stdout},
     path::Path,
+    time::Duration,
 };
 
 // === APP STATE ===
@@ -32,7 +36,7 @@ enum SelectedPanel {
 #[derive(PartialEq, Clone, Copy)]
 enum WaveDetailField {
     SpawnInterval,
-    Spawn(usize), // Index of spawn
+    Spawn(usize),
 }
 
 impl WaveDetailField {
@@ -94,18 +98,17 @@ struct App {
     editing: bool,
     edit_buffer: String,
     picker: Picker,
-    unit_image: Option<StatefulProtocol>,
+    unit_animation: Option<Animation>,
 }
 
 impl App {
     fn new() -> io::Result<Self> {
-        // Load configs
         let units_config =
             UnitsConfig::load().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
         let waves_config =
             WavesConfig::load().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-        
+
         let mut app = Self {
             units: units_config.units,
             waves: waves_config.waves,
@@ -120,7 +123,7 @@ impl App {
             editing: false,
             edit_buffer: String::new(),
             picker: Picker::from_query_stdio().unwrap_or(Picker::halfblocks()),
-            unit_image: None,
+            unit_animation: None,
         };
 
         if !app.waves.is_empty() {
@@ -130,7 +133,7 @@ impl App {
 
         if !app.units.is_empty() {
             app.unit_list_state.select(Some(0));
-            app.load_selected_unit_image();
+            app.load_selected_unit_animation();
         }
 
         Ok(app)
@@ -178,7 +181,7 @@ impl App {
             None => 0,
         };
         self.unit_list_state.select(Some(i));
-        self.load_selected_unit_image();
+        self.load_selected_unit_animation();
     }
 
     fn previous_unit(&mut self) {
@@ -193,30 +196,43 @@ impl App {
             None => 0,
         };
         self.unit_list_state.select(Some(i));
-        self.load_selected_unit_image();
+        self.load_selected_unit_animation();
     }
 
-    fn load_selected_unit_image(&mut self) {
+    fn load_selected_unit_animation(&mut self) {
         if let Some(idx) = self.unit_list_state.selected() {
             if let Some(unit) = self.units.get(idx) {
                 let sprite_path = format!("assets/{}", unit.sprite_path);
                 if let Ok(dyn_img) = image::ImageReader::open(&sprite_path)
                     .and_then(|r| r.decode().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)))
                 {
-                    // Crop to first frame (assuming square frames based on height)
-                    let height = dyn_img.height();
-                    let frame_width = height; // Assume square frames
-                    let cropped = dyn_img.crop_imm(0, 0, frame_width, height);
-                    self.unit_image = Some(self.picker.new_resize_protocol(cropped));
+                    match Animation::from_sprite_sheet(
+                        &dyn_img,
+                        unit.frame_count,
+                        unit.frame_size,
+                        &self.picker,
+                    ) {
+                        Ok(animation) => {
+                            self.unit_animation = Some(animation);
+                        }
+                        Err(_) => {
+                            self.unit_animation = None;
+                        }
+                    }
                 } else {
-                    self.unit_image = None;
+                    self.unit_animation = None;
                 }
             }
         }
     }
 
+    fn update_animation(&mut self) {
+        if let Some(ref mut animation) = self.unit_animation {
+            animation.update();
+        }
+    }
+
     fn save(&mut self) -> io::Result<()> {
-        // Save waves config
         let waves_config = WavesConfig {
             waves: self.waves.clone(),
         };
@@ -224,7 +240,6 @@ impl App {
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         fs::write("waves.toml", waves_toml)?;
 
-        // Save units config
         let units_config = UnitsConfig {
             units: self.units.clone(),
         };
@@ -284,7 +299,6 @@ impl App {
             };
             self.waves[idx].spawns.push(new_spawn);
             self.current_wave = Some(self.waves[idx].clone());
-            // Select the newly added spawn
             let new_spawn_idx = self.waves[idx].spawns.len() - 1;
             self.selected_field = WaveDetailField::Spawn(new_spawn_idx);
             self.status_message = "Added new spawn to wave".to_string();
@@ -300,7 +314,6 @@ impl App {
                     self.waves[wave_idx].spawns.remove(spawn_idx);
                     self.current_wave = Some(self.waves[wave_idx].clone());
 
-                    // Adjust selected field
                     if self.waves[wave_idx].spawns.is_empty() {
                         self.selected_field = WaveDetailField::SpawnInterval;
                     } else if spawn_idx > 0 {
@@ -366,7 +379,6 @@ impl App {
                 if spawn_idx < self.waves[wave_idx].spawns.len() {
                     let current_unit_id = &self.waves[wave_idx].spawns[spawn_idx].unit_id;
 
-                    // Find current unit index and cycle to next
                     if let Some(current_idx) =
                         self.units.iter().position(|u| &u.id == current_unit_id)
                     {
@@ -422,7 +434,6 @@ impl App {
                     if *spawn_idx < self.waves[wave_idx].spawns.len() {
                         match self.selected_spawn_field {
                             SpawnField::UnitType => {
-                                // Validate unit ID exists
                                 if self.units.iter().any(|u| u.id == self.edit_buffer) {
                                     self.waves[wave_idx].spawns[*spawn_idx].unit_id =
                                         self.edit_buffer.clone();
@@ -493,25 +504,16 @@ fn ui(f: &mut Frame, app: &mut App) {
         ])
         .split(chunks[0]);
 
-    // Render waves list
     render_waves_list(f, app, main_chunks[0]);
-
-    // Render wave details
     render_wave_details(f, app, main_chunks[1]);
 
-    // Split units panel into image preview (top) and units list (bottom)
     let units_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(12), Constraint::Min(0)])
         .split(main_chunks[2]);
 
-    // Render unit image preview
-    render_unit_image(f, app, units_chunks[0]);
-
-    // Render units list
+    render_unit_animation(f, app, units_chunks[0]);
     render_units_list(f, app, units_chunks[1]);
-
-    // Render status bar
     render_status_bar(f, app, chunks[1]);
 }
 
@@ -549,7 +551,7 @@ fn render_waves_list(f: &mut Frame, app: &mut App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Waves (↑/↓ to navigate, 'n' to add)")
+                .title("Waves (↑/↓ to navigate, 'a' to add)")
                 .border_style(border_style),
         )
         .highlight_style(
@@ -576,7 +578,6 @@ fn render_wave_details(f: &mut Frame, app: &App, area: Rect) {
             Span::raw(wave.wave_number.to_string()),
         ])];
 
-        // Spawn Interval field
         let is_interval_selected =
             matches!(app.selected_field, WaveDetailField::SpawnInterval) && is_selected;
         let is_interval_editing = app.editing && is_interval_selected;
@@ -615,7 +616,6 @@ fn render_wave_details(f: &mut Frame, app: &App, area: Rect) {
 
                 lines.push(Line::from(""));
 
-                // Unit Type field
                 let is_unit_field =
                     is_spawn_selected && matches!(app.selected_spawn_field, SpawnField::UnitType);
                 let is_editing_unit = app.editing && is_unit_field;
@@ -638,7 +638,6 @@ fn render_wave_details(f: &mut Frame, app: &App, area: Rect) {
                 }
                 lines.push(Line::from(unit_spans));
 
-                // Count field
                 let is_count_field =
                     is_spawn_selected && matches!(app.selected_spawn_field, SpawnField::Count);
                 let is_editing_count = app.editing && is_count_field;
@@ -664,7 +663,6 @@ fn render_wave_details(f: &mut Frame, app: &App, area: Rect) {
                 }
                 lines.push(Line::from(count_spans));
 
-                // Health Multiplier field
                 let is_health_field = is_spawn_selected
                     && matches!(app.selected_spawn_field, SpawnField::HealthMultiplier);
                 let is_editing_health = app.editing && is_health_field;
@@ -690,7 +688,6 @@ fn render_wave_details(f: &mut Frame, app: &App, area: Rect) {
                 }
                 lines.push(Line::from(health_spans));
 
-                // Unit stats (read-only)
                 lines.push(Line::from(vec![
                     Span::raw("   Speed: "),
                     Span::styled(
@@ -733,7 +730,7 @@ fn render_wave_details(f: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-fn render_unit_image(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_unit_animation(f: &mut Frame, app: &mut App, area: Rect) {
     let is_selected = matches!(app.selected_panel, SelectedPanel::Units);
     let border_style = if is_selected {
         Style::default().fg(Color::Green)
@@ -743,17 +740,19 @@ fn render_unit_image(f: &mut Frame, app: &mut App, area: Rect) {
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .title("Unit Preview")
+        .title("Unit Animation Preview")
         .border_style(border_style);
 
     let inner_area = block.inner(area);
     f.render_widget(block, area);
 
-    if let Some(ref mut image_protocol) = app.unit_image {
-        let image_widget = StatefulImage::default();
-        f.render_stateful_widget(image_widget, inner_area, image_protocol);
+    if let Some(ref mut animation) = app.unit_animation {
+        if let Some(frame) = animation.current_frame() {
+            let image_widget = StatefulImage::default();
+            f.render_stateful_widget(image_widget, inner_area, frame);
+        }
     } else {
-        let placeholder = Paragraph::new("No image available")
+        let placeholder = Paragraph::new("No animation available")
             .style(Style::default().fg(Color::DarkGray));
         f.render_widget(placeholder, inner_area);
     }
@@ -796,12 +795,9 @@ fn render_units_list(f: &mut Frame, app: &mut App, area: Rect) {
                     ),
                 ]),
                 Line::from(vec![
-                    Span::raw("  Asset: "),
+                    Span::raw("  Frames: "),
                     Span::styled(
-                        Path::new(&unit.sprite_path)
-                            .file_name()
-                            .and_then(|n| n.to_str())
-                            .unwrap_or(&unit.sprite_path),
+                        unit.frame_count.to_string(),
                         Style::default().fg(Color::Gray),
                     ),
                 ]),
@@ -845,20 +841,15 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
 // === MAIN ===
 
 fn main() -> io::Result<()> {
-    // Setup terminal
     enable_raw_mode()?;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Create app
     let mut app = App::new()?;
-
-    // Run app
     let res = run_app(&mut terminal, &mut app);
 
-    // Restore terminal
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -867,7 +858,7 @@ fn main() -> io::Result<()> {
     )?;
     terminal.show_cursor()?;
 
-    Ok(())
+    res
 }
 
 fn run_app<B: ratatui::backend::Backend>(
@@ -878,91 +869,85 @@ where
     B::Error: std::fmt::Debug,
 {
     loop {
+        app.update_animation();
+
         terminal
             .draw(|f| ui(f, app))
             .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{:?}", e)))?;
 
-        if let Event::Key(key) = event::read()? {
-            // Handle editing mode separately
-            if app.editing {
-                match key.code {
-                    KeyCode::Enter => {
-                        app.confirm_edit();
-                    }
-                    KeyCode::Esc => {
-                        app.cancel_edit();
-                    }
-                    KeyCode::Backspace => {
-                        app.edit_buffer.pop();
-                    }
-                    KeyCode::Char(c) => {
-                        app.edit_buffer.push(c);
-                    }
-                    _ => {}
-                }
-            } else {
-                // Normal mode input handling
-                match key.code {
-                    KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Char('w') => {
-                        app.save()?;
-                    }
-                    KeyCode::Char('a') => {
-                        app.add_new_wave();
-                    }
-                    KeyCode::Char('x') => {
-                        if matches!(app.selected_panel, SelectedPanel::Waves) {
-                            app.delete_current_wave();
+        if poll(Duration::from_millis(16))? {
+            if let Event::Key(key) = event::read()? {
+                if app.editing {
+                    match key.code {
+                        KeyCode::Enter => app.confirm_edit(),
+                        KeyCode::Esc => app.cancel_edit(),
+                        KeyCode::Backspace => {
+                            app.edit_buffer.pop();
                         }
-                    }
-                    KeyCode::Insert => {
-                        if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
-                            app.add_spawn_to_current_wave();
+                        KeyCode::Char(c) => {
+                            app.edit_buffer.push(c);
                         }
+                        _ => {}
                     }
-                    KeyCode::Delete => {
-                        if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
-                            app.remove_current_spawn();
+                } else {
+                    match key.code {
+                        KeyCode::Char('q') => return Ok(()),
+                        KeyCode::Char('w') => app.save()?,
+                        KeyCode::Char('a') => app.add_new_wave(),
+                        KeyCode::Char('x') => {
+                            if matches!(app.selected_panel, SelectedPanel::Waves) {
+                                app.delete_current_wave();
+                            }
                         }
-                    }
-                    KeyCode::Char(' ') => {
-                        if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
-                            app.cycle_unit_for_current_spawn();
+                        KeyCode::Insert => {
+                            if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
+                                app.add_spawn_to_current_wave();
+                            }
                         }
-                    }
-                    KeyCode::Enter => {
-                        if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
-                            app.start_editing();
+                        KeyCode::Delete => {
+                            if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
+                                app.remove_current_spawn();
+                            }
                         }
-                    }
-                    KeyCode::Down => match app.selected_panel {
-                        SelectedPanel::Waves => app.next_wave(),
-                        SelectedPanel::WaveDetails => app.next_field(),
-                        SelectedPanel::Units => app.next_unit(),
-                    },
-                    KeyCode::Up => match app.selected_panel {
-                        SelectedPanel::Waves => app.previous_wave(),
-                        SelectedPanel::WaveDetails => app.prev_field(),
-                        SelectedPanel::Units => app.previous_unit(),
-                    },
-                    KeyCode::Left => {
-                        if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
-                            app.prev_spawn_field();
+                        KeyCode::Char(' ') => {
+                            if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
+                                app.cycle_unit_for_current_spawn();
+                            }
                         }
-                    }
-                    KeyCode::Right => {
-                        if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
-                            app.next_spawn_field();
+                        KeyCode::Enter => {
+                            if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
+                                app.start_editing();
+                            }
                         }
+                        KeyCode::Down => match app.selected_panel {
+                            SelectedPanel::Waves => app.next_wave(),
+                            SelectedPanel::WaveDetails => app.next_field(),
+                            SelectedPanel::Units => app.next_unit(),
+                        },
+                        KeyCode::Up => match app.selected_panel {
+                            SelectedPanel::Waves => app.previous_wave(),
+                            SelectedPanel::WaveDetails => app.prev_field(),
+                            SelectedPanel::Units => app.previous_unit(),
+                        },
+                        KeyCode::Left => {
+                            if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
+                                app.prev_spawn_field();
+                            }
+                        }
+                        KeyCode::Right => {
+                            if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
+                                app.next_spawn_field();
+                            }
+                        }
+                        KeyCode::Tab => {
+                            app.selected_panel = match app.selected_panel {
+                                SelectedPanel::Waves => SelectedPanel::WaveDetails,
+                                SelectedPanel::WaveDetails => SelectedPanel::Units,
+                                SelectedPanel::Units => SelectedPanel::Waves,
+                            };
+                        }
+                        _ => {}
                     }
-                    KeyCode::Tab => {
-                        app.selected_panel = match app.selected_panel {
-                            SelectedPanel::Waves => SelectedPanel::WaveDetails,
-                            SelectedPanel::WaveDetails => SelectedPanel::Units,
-                            SelectedPanel::Units => SelectedPanel::Waves,
-                        };
-                    }
-                    _ => {}
                 }
             }
         }
