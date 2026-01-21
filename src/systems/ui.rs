@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::components::{AnimationTimer, Enemy, GameUI, HealthBar};
 use crate::constants::SCALED_TILE_SIZE;
 use crate::resources::GameState;
+use crate::systems::AnimationInfo;
 
 pub fn update_ui(game_state: Res<GameState>, mut ui_query: Query<&mut Text, With<GameUI>>) {
     for mut text in ui_query.iter_mut() {
@@ -36,13 +37,16 @@ pub fn update_health_bars(
         }
     }
 }
-
-pub fn animate_sprites(time: Res<Time>, mut query: Query<(&mut AnimationTimer, &mut Sprite)>) {
-    for (mut timer, mut sprite) in query.iter_mut() {
+pub fn animate_sprites(
+    time: Res<Time>,
+    mut query: Query<(&mut AnimationTimer, &mut Sprite, &AnimationInfo)>,
+) {
+    for (mut timer, mut sprite, anim_info) in query.iter_mut() {
         timer.timer.tick(time.delta());
         if timer.timer.just_finished() {
             if let Some(atlas) = &mut sprite.texture_atlas {
-                atlas.index = (atlas.index + 1) % 6; // Cycle through 6 frames
+                // Cycle through frames based on the unit's frame_count
+                atlas.index = (atlas.index + 1) % anim_info.frame_count;
             }
         }
     }

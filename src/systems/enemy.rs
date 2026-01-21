@@ -4,6 +4,11 @@ use crate::components::{AnimationTimer, Enemy, HealthBar};
 use crate::constants::{SCALED_TILE_SIZE, WARRIOR_FRAME_SIZE};
 use crate::resources::{EnemySpawner, GameState, PathWaypoints, WaveConfigs};
 
+#[derive(Component)]
+pub struct AnimationInfo {
+    pub frame_count: usize,
+}
+
 pub fn spawn_enemies(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -20,23 +25,26 @@ pub fn spawn_enemies(
         // Get current wave config
         let current_wave_idx = (game_state.wave - 1) as usize;
         if current_wave_idx >= wave_configs.waves.len() {
-            // No more waves defined, use last wave with increased difficulty
+            // No more waves defined
             return;
         }
 
         let wave = &wave_configs.waves[current_wave_idx];
 
         // Calculate which spawn we're on
-        let mut total_count = 0;
+        let mut cumulative_count = 0;
         let mut selected_spawn = None;
 
         for spawn in &wave.spawns {
-            total_count += spawn.count;
-            if spawner.enemies_spawned < total_count {
+            let spawn_end = cumulative_count + spawn.count;
+            if spawner.enemies_spawned >= cumulative_count && spawner.enemies_spawned < spawn_end {
                 selected_spawn = Some(spawn);
                 break;
             }
+            cumulative_count = spawn_end;
         }
+
+        let total_count = wave.spawns.iter().map(|s| s.count).sum::<i32>();
 
         if let Some(spawn) = selected_spawn {
             // Find the unit type
@@ -47,13 +55,19 @@ pub fn spawn_enemies(
                 // Calculate health based on unit type and multiplier
                 let max_health = unit_type.base_health * spawn.health_multiplier;
 
-                // Create texture atlas layout for the sprite sheet
-                // Assuming 6 frames in sprite sheets
-                let layout = TextureAtlasLayout::from_grid(UVec2::splat(192), 6, 1, None, None);
+                // Create texture atlas layout using unit_type data
+                let [frame_width, frame_height] = unit_type.frame_size;
+                let layout = TextureAtlasLayout::from_grid(
+                    UVec2::new(frame_width, frame_height),
+                    unit_type.frame_count as u32,
+                    1, // Assuming horizontal sprite sheets
+                    None,
+                    None,
+                );
                 let texture_atlas_layout = texture_atlases.add(layout);
 
-                // Scale to fit 1 tile
-                let enemy_scale = SCALED_TILE_SIZE / WARRIOR_FRAME_SIZE.x;
+                // Scale to fit 1 tile (using frame width as reference)
+                let enemy_scale = SCALED_TILE_SIZE / frame_width as f32;
 
                 let enemy_entity = commands
                     .spawn((
@@ -75,6 +89,9 @@ pub fn spawn_enemies(
                         },
                         AnimationTimer {
                             timer: Timer::from_seconds(0.1, TimerMode::Repeating),
+                        },
+                        AnimationInfo {
+                            frame_count: unit_type.frame_count,
                         },
                     ))
                     .id();
