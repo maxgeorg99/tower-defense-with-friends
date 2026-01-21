@@ -1,12 +1,5 @@
 use bevy::prelude::*;
 
-#[cfg(feature = "bevy-demo")]
-use notify::{Event, Watcher};
-#[cfg(feature = "bevy-demo")]
-use std::sync::mpsc::Receiver;
-#[cfg(feature = "bevy-demo")]
-use std::sync::{Arc, Mutex};
-
 use crate::config::{TowerType, UnitType, Wave};
 use crate::constants::{MAP_HEIGHT, MAP_WIDTH};
 
@@ -69,13 +62,6 @@ impl EnemySpawner {
 #[derive(Resource)]
 pub struct PathWaypoints {
     pub points: Vec<Vec2>,
-}
-
-#[cfg(feature = "bevy-demo")]
-#[derive(Resource, Clone)]
-pub struct FileWatcher {
-    pub receiver: Arc<Mutex<Receiver<notify::Result<Event>>>>,
-    pub _watcher: Arc<Mutex<Box<dyn Watcher + Send>>>,
 }
 
 #[derive(Resource)]

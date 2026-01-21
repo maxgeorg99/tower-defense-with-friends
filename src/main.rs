@@ -1,49 +1,40 @@
 #[cfg(feature = "bevy-demo")]
 mod auth;
 #[cfg(feature = "bevy-demo")]
+mod debug;
+#[cfg(feature = "bevy-demo")]
 mod module_bindings;
 
+mod bevy;
 mod components;
 mod config;
 mod constants;
+mod events;
 mod map;
 mod resources;
 mod systems;
 
 use config::{TowersConfig, UnitsConfig, WavesConfig};
 
-use bevy::prelude::*;
-use bevy_ecs_tiled::prelude::*;
+use ::bevy::prelude::*;
 use bevy_spacetimedb::*;
 use module_bindings::user_table::UserTableAccess;
 use module_bindings::{DbConnection, RemoteModule, RemoteTables};
 
-#[cfg(feature = "bevy-demo")]
-use notify::{RecursiveMode, Watcher};
-#[cfg(feature = "bevy-demo")]
-use std::path::Path;
-#[cfg(feature = "bevy-demo")]
-use std::sync::mpsc::channel;
-#[cfg(feature = "bevy-demo")]
-use std::sync::{Arc, Mutex};
 use auth::{
     check_auth_and_connect, cleanup_login_screen, handle_anonymous_button,
     handle_login_button, load_token_from_file, setup_login_screen, update_login_button_colors,
     AuthConfig, AuthState,
 };
+use bevy::BevyPlugin;
+#[cfg(feature = "bevy-demo")]
+use debug::DebugPlugin;
+use events::EventPlugin;
 use map::create_path_waypoints;
 use resources::*;
 use systems::*;
 
 fn main() {
-    // Connect to devtools for hot-reloading
-    #[cfg(feature = "bevy-demo")]
-    {
-        std::thread::spawn(|| {
-            dioxus_devtools::connect_subsecond();
-        });
-    }
-
     // Load initial configs
     let units = UnitsConfig::load()
         .expect("Failed to load units.toml")
@@ -84,15 +75,10 @@ fn main() {
     };
 
     let mut app = App::new();
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            title: "Tower Defense MMO".to_string(),
-            resolution: (1024, 768).into(),
-            ..default()
-        }),
-        ..default()
-    }))
-    .add_plugins(TiledPlugin::default());
+
+    // Add core plugins
+    app.add_plugins(BevyPlugin)
+        .add_plugins(EventPlugin);
 
     // Store connection config for deferred connection
     app.insert_resource(StdbConfig {
@@ -198,29 +184,9 @@ fn main() {
     .add_systems(OnEnter(AppState::GameOver), setup_game_over_screen)
     .add_systems(OnExit(AppState::GameOver), cleanup_game_over_screen);
 
-    // Setup file watching for hot-reloading
+    // Add debug plugin for hot-reloading (only in bevy-demo feature)
     #[cfg(feature = "bevy-demo")]
-    {
-        let (tx, rx) = channel();
-        let mut watcher =
-            notify::recommended_watcher(tx).expect("Failed to create file watcher");
-
-        watcher
-            .watch(Path::new("units.toml"), RecursiveMode::NonRecursive)
-            .expect("Failed to watch units.toml");
-        watcher
-            .watch(Path::new("waves.toml"), RecursiveMode::NonRecursive)
-            .expect("Failed to watch waves.toml");
-        watcher
-            .watch(Path::new("towers.toml"), RecursiveMode::NonRecursive)
-            .expect("Failed to watch towers.toml");
-
-        app.insert_resource(FileWatcher {
-            receiver: Arc::new(Mutex::new(rx)),
-            _watcher: Arc::new(Mutex::new(Box::new(watcher))),
-        });
-        app.add_systems(Update, watch_config_files);
-    }
+    app.add_plugins(DebugPlugin);
 
     app.run();
 }

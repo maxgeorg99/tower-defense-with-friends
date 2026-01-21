@@ -30,15 +30,15 @@ dev:
 
 # Run game connected to local SpacetimeDB
 bevy:
-    SPACETIMEDB_URI="http://127.0.0.1:3000" SPACETIMEDB_MODULE={{MODULE_NAME}} SPACETIMEDB_CLIENT_ID={{AUTH_CLIENT_ID}} SPACETIMEDB_REQUIRE_AUTH=1 cargo run --features bevy-demo --bin bevy-demo
+    SPACETIMEDB_URI="http://127.0.0.1:3000" SPACETIMEDB_MODULE={{MODULE_NAME}} SPACETIMEDB_CLIENT_ID={{AUTH_CLIENT_ID}} SPACETIMEDB_REQUIRE_AUTH=1 cargo run --features bevy-demo --bin game
 
 # Run game connected to maincloud (with login screen)
 bevy-live:
-    SPACETIMEDB_URI={{MAINCLOUD_URI}} SPACETIMEDB_MODULE={{MODULE_NAME}} SPACETIMEDB_CLIENT_ID={{AUTH_CLIENT_ID}} SPACETIMEDB_REQUIRE_AUTH=1 cargo run --features bevy-demo --bin bevy-demo
+    SPACETIMEDB_URI={{MAINCLOUD_URI}} SPACETIMEDB_MODULE={{MODULE_NAME}} SPACETIMEDB_CLIENT_ID={{AUTH_CLIENT_ID}} SPACETIMEDB_REQUIRE_AUTH=1 cargo run --features bevy-demo --bin game
 
 # Run with hot reloading (local)
 bevy-hot:
-    SPACETIMEDB_URI="http://127.0.0.1:3000" SPACETIMEDB_MODULE={{MODULE_NAME}} BEVY_ASSET_ROOT="." dx serve --bin bevy-demo --hot-patch --features "bevy-hotpatch"
+    SPACETIMEDB_URI="http://127.0.0.1:3000" SPACETIMEDB_MODULE={{MODULE_NAME}} BEVY_ASSET_ROOT="." dx serve --bin game --hot-patch --features "bevy-hotpatch"
 
 # === Tools ===
 
