@@ -7,6 +7,7 @@ pub mod projectile;
 pub mod setup;
 pub mod tower;
 pub mod ui;
+pub mod menu;
 
 pub use camera::*;
 pub use enemy::*;

@@ -13,7 +13,7 @@ mod events;
 mod map;
 mod resources;
 mod systems;
-
+use menu::MenuPlugin;
 use config::{TowersConfig, UnitsConfig, WavesConfig};
 
 use ::bevy::prelude::*;
@@ -68,17 +68,14 @@ fn main() {
 
     // Determine initial state based on auth
     let has_token = stdb_token.is_some();
-    let initial_state = if require_auth && !has_token {
-        AppState::Login
-    } else {
-        AppState::InGame
-    };
+    let initial_state = AppState::MainMenu;
 
     let mut app = App::new();
 
     // Add core plugins
     app.add_plugins(BevyPlugin)
-        .add_plugins(EventPlugin);
+        .add_plugins(EventPlugin)
+        .add_plugins(MenuPlugin);
 
     // Store connection config for deferred connection
     app.insert_resource(StdbConfig {

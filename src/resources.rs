@@ -35,6 +35,8 @@ pub enum AppState {
     /// Show login screen (when auth is required)
     #[default]
     Login,
+    /// Main Menu
+    MainMenu,
     /// Main game
     InGame,
     /// Game over screen
