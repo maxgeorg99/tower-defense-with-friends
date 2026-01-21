@@ -85,6 +85,51 @@ impl SpawnField {
     }
 }
 
+#[derive(PartialEq, Clone, Copy)]
+enum UnitField {
+    Id,
+    Name,
+    SpritePath,
+    BaseHealth,
+    BaseSpeed,
+    DamageToBase,
+    GoldReward,
+    FrameCount,
+    FrameSize,
+}
+
+impl UnitField {
+    fn all() -> Vec<UnitField> {
+        vec![
+            UnitField::Id,
+            UnitField::Name,
+            UnitField::SpritePath,
+            UnitField::BaseHealth,
+            UnitField::BaseSpeed,
+            UnitField::DamageToBase,
+            UnitField::GoldReward,
+            UnitField::FrameCount,
+            UnitField::FrameSize,
+        ]
+    }
+
+    fn next(&self) -> UnitField {
+        let all = Self::all();
+        let current_idx = all.iter().position(|f| f == self).unwrap();
+        all[(current_idx + 1) % all.len()]
+    }
+
+    fn prev(&self) -> UnitField {
+        let all = Self::all();
+        let current_idx = all.iter().position(|f| f == self).unwrap();
+        if current_idx == 0 {
+            all[all.len() - 1]
+        } else {
+            all[current_idx - 1]
+        }
+    }
+}
+
 struct App {
     units: Vec<UnitType>,
     waves: Vec<Wave>,
@@ -92,9 +137,11 @@ struct App {
     wave_list_state: ListState,
     unit_list_state: ListState,
     current_wave: Option<Wave>,
+    current_unit: Option<UnitType>,
     status_message: String,
     selected_field: WaveDetailField,
     selected_spawn_field: SpawnField,
+    selected_unit_field: UnitField,
     editing: bool,
     edit_buffer: String,
     picker: Picker,
@@ -116,10 +163,12 @@ impl App {
             wave_list_state: ListState::default(),
             unit_list_state: ListState::default(),
             current_wave: None,
-            status_message: "q:quit | w:save | a:new wave | x:delete | Tab:switch | ↑/↓:navigate | Enter:edit/save"
+            current_unit: None,
+            status_message: "q:quit | w:save | a:new | x:delete | Tab:switch | ↑/↓:navigate | Enter:edit"
                 .to_string(),
             selected_field: WaveDetailField::SpawnInterval,
             selected_spawn_field: SpawnField::UnitType,
+            selected_unit_field: UnitField::Id,
             editing: false,
             edit_buffer: String::new(),
             picker: Picker::from_query_stdio().unwrap_or(Picker::halfblocks()),
@@ -133,6 +182,7 @@ impl App {
 
         if !app.units.is_empty() {
             app.unit_list_state.select(Some(0));
+            app.current_unit = Some(app.units[0].clone());
             app.load_selected_unit_animation();
         }
 
@@ -181,6 +231,8 @@ impl App {
             None => 0,
         };
         self.unit_list_state.select(Some(i));
+        self.current_unit = Some(self.units[i].clone());
+        self.selected_unit_field = UnitField::Id;
         self.load_selected_unit_animation();
     }
 
@@ -196,6 +248,8 @@ impl App {
             None => 0,
         };
         self.unit_list_state.select(Some(i));
+        self.current_unit = Some(self.units[i].clone());
+        self.selected_unit_field = UnitField::Id;
         self.load_selected_unit_animation();
     }
 
@@ -485,6 +539,173 @@ impl App {
         self.edit_buffer.clear();
         self.status_message = "Edit cancelled".to_string();
     }
+
+    // Unit editing methods
+    fn next_unit_field(&mut self) {
+        self.selected_unit_field = self.selected_unit_field.next();
+    }
+
+    fn prev_unit_field(&mut self) {
+        self.selected_unit_field = self.selected_unit_field.prev();
+    }
+
+    fn start_editing_unit(&mut self) {
+        if let Some(unit) = &self.current_unit {
+            self.editing = true;
+            self.edit_buffer = match self.selected_unit_field {
+                UnitField::Id => unit.id.clone(),
+                UnitField::Name => unit.name.clone(),
+                UnitField::SpritePath => unit.sprite_path.clone(),
+                UnitField::BaseHealth => unit.base_health.to_string(),
+                UnitField::BaseSpeed => unit.base_speed.to_string(),
+                UnitField::DamageToBase => unit.damage_to_base.to_string(),
+                UnitField::GoldReward => unit.gold_reward.to_string(),
+                UnitField::FrameCount => unit.frame_count.to_string(),
+                UnitField::FrameSize => format!("{}x{}", unit.frame_size[0], unit.frame_size[1]),
+            };
+            self.status_message = "Editing (Enter to save, Esc to cancel)".to_string();
+        }
+    }
+
+    fn confirm_unit_edit(&mut self) {
+        if let Some(unit_idx) = self.unit_list_state.selected() {
+            let result = match self.selected_unit_field {
+                UnitField::Id => {
+                    if !self.edit_buffer.is_empty() {
+                        self.units[unit_idx].id = self.edit_buffer.clone();
+                        Ok("ID updated".to_string())
+                    } else {
+                        Err("ID cannot be empty".to_string())
+                    }
+                }
+                UnitField::Name => {
+                    if !self.edit_buffer.is_empty() {
+                        self.units[unit_idx].name = self.edit_buffer.clone();
+                        Ok("Name updated".to_string())
+                    } else {
+                        Err("Name cannot be empty".to_string())
+                    }
+                }
+                UnitField::SpritePath => {
+                    if !self.edit_buffer.is_empty() {
+                        self.units[unit_idx].sprite_path = self.edit_buffer.clone();
+                        self.load_selected_unit_animation();
+                        Ok("Sprite path updated".to_string())
+                    } else {
+                        Err("Sprite path cannot be empty".to_string())
+                    }
+                }
+                UnitField::BaseHealth => {
+                    if let Ok(value) = self.edit_buffer.parse::<f32>() {
+                        self.units[unit_idx].base_health = value;
+                        Ok(format!("Base health set to {}", value))
+                    } else {
+                        Err("Invalid number".to_string())
+                    }
+                }
+                UnitField::BaseSpeed => {
+                    if let Ok(value) = self.edit_buffer.parse::<f32>() {
+                        self.units[unit_idx].base_speed = value;
+                        Ok(format!("Base speed set to {}", value))
+                    } else {
+                        Err("Invalid number".to_string())
+                    }
+                }
+                UnitField::DamageToBase => {
+                    if let Ok(value) = self.edit_buffer.parse::<i32>() {
+                        self.units[unit_idx].damage_to_base = value;
+                        Ok(format!("Damage to base set to {}", value))
+                    } else {
+                        Err("Invalid number".to_string())
+                    }
+                }
+                UnitField::GoldReward => {
+                    if let Ok(value) = self.edit_buffer.parse::<i32>() {
+                        self.units[unit_idx].gold_reward = value;
+                        Ok(format!("Gold reward set to {}", value))
+                    } else {
+                        Err("Invalid number".to_string())
+                    }
+                }
+                UnitField::FrameCount => {
+                    if let Ok(value) = self.edit_buffer.parse::<usize>() {
+                        self.units[unit_idx].frame_count = value;
+                        self.load_selected_unit_animation();
+                        Ok(format!("Frame count set to {}", value))
+                    } else {
+                        Err("Invalid number".to_string())
+                    }
+                }
+                UnitField::FrameSize => {
+                    let parts: Vec<&str> = self.edit_buffer.split('x').collect();
+                    if parts.len() == 2 {
+                        if let (Ok(w), Ok(h)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                            self.units[unit_idx].frame_size = [w, h];
+                            self.load_selected_unit_animation();
+                            Ok(format!("Frame size set to {}x{}", w, h))
+                        } else {
+                            Err("Invalid format (use WxH, e.g., 64x64)".to_string())
+                        }
+                    } else {
+                        Err("Invalid format (use WxH, e.g., 64x64)".to_string())
+                    }
+                }
+            };
+
+            match result {
+                Ok(msg) => {
+                    self.current_unit = Some(self.units[unit_idx].clone());
+                    self.status_message = msg;
+                    self.editing = false;
+                }
+                Err(msg) => {
+                    self.status_message = msg;
+                }
+            }
+        }
+        self.edit_buffer.clear();
+    }
+
+    fn add_new_unit(&mut self) {
+        let new_unit_id = format!("unit_{}", self.units.len() + 1);
+        let new_unit = UnitType {
+            id: new_unit_id.clone(),
+            name: format!("New Unit {}", self.units.len() + 1),
+            sprite_path: "Units/Blue Units/Warrior/Warrior_Blue.png".to_string(),
+            base_health: 100.0,
+            base_speed: 50.0,
+            damage_to_base: 1,
+            gold_reward: 10,
+            frame_count: 6,
+            frame_size: [192, 192],
+        };
+        self.units.push(new_unit.clone());
+        self.unit_list_state.select(Some(self.units.len() - 1));
+        self.current_unit = Some(new_unit);
+        self.selected_unit_field = UnitField::Id;
+        self.load_selected_unit_animation();
+        self.status_message = format!("Added {}", new_unit_id);
+    }
+
+    fn delete_current_unit(&mut self) {
+        if let Some(idx) = self.unit_list_state.selected() {
+            if !self.units.is_empty() {
+                let deleted_name = self.units[idx].name.clone();
+                self.units.remove(idx);
+                self.status_message = format!("Deleted {}", deleted_name);
+
+                if self.units.is_empty() {
+                    self.current_unit = None;
+                    self.unit_list_state.select(None);
+                } else {
+                    let new_idx = idx.min(self.units.len() - 1);
+                    self.unit_list_state.select(Some(new_idx));
+                    self.current_unit = Some(self.units[new_idx].clone());
+                    self.load_selected_unit_animation();
+                }
+            }
+        }
+    }
 }
 
 // === UI RENDERING ===
@@ -759,54 +980,6 @@ fn render_unit_animation(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn render_units_list(f: &mut Frame, app: &mut App, area: Rect) {
-    let items: Vec<ListItem> = app
-        .units
-        .iter()
-        .map(|unit| {
-            let content = vec![
-                Line::from(vec![Span::styled(
-                    &unit.name,
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                )]),
-                Line::from(vec![
-                    Span::raw("  HP: "),
-                    Span::styled(
-                        format!("{:.0}", unit.base_health),
-                        Style::default().fg(Color::Red),
-                    ),
-                    Span::raw(" | Spd: "),
-                    Span::styled(
-                        format!("{:.0}", unit.base_speed),
-                        Style::default().fg(Color::Cyan),
-                    ),
-                ]),
-                Line::from(vec![
-                    Span::raw("  Dmg: "),
-                    Span::styled(
-                        unit.damage_to_base.to_string(),
-                        Style::default().fg(Color::Magenta),
-                    ),
-                    Span::raw(" | Gold: "),
-                    Span::styled(
-                        unit.gold_reward.to_string(),
-                        Style::default().fg(Color::Yellow),
-                    ),
-                ]),
-                Line::from(vec![
-                    Span::raw("  Frames: "),
-                    Span::styled(
-                        unit.frame_count.to_string(),
-                        Style::default().fg(Color::Gray),
-                    ),
-                ]),
-                Line::from(""),
-            ];
-            ListItem::new(content)
-        })
-        .collect();
-
     let is_selected = matches!(app.selected_panel, SelectedPanel::Units);
     let border_style = if is_selected {
         Style::default().fg(Color::Green)
@@ -814,21 +987,92 @@ fn render_units_list(f: &mut Frame, app: &mut App, area: Rect) {
         Style::default()
     };
 
-    let list = List::new(items)
-        .block(
+    if let Some(unit) = &app.current_unit {
+        let make_field_line = |field: UnitField, label: String, value: String, color: Color| {
+            let is_field_selected = app.selected_unit_field == field && is_selected;
+            let is_editing = app.editing && is_field_selected;
+
+            let mut spans = vec![
+                Span::styled(
+                    if is_field_selected { ">> " } else { "   " },
+                    Style::default().fg(Color::Green),
+                ),
+                Span::styled(label, Style::default().fg(color)),
+            ];
+
+            if is_editing {
+                spans.push(Span::styled(
+                    app.edit_buffer.clone(),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            } else {
+                spans.push(Span::raw(value));
+            }
+
+            Line::from(spans)
+        };
+
+        let unit_idx = app.unit_list_state.selected().unwrap_or(0);
+        let unit_selector = Line::from(vec![
+            Span::styled("Unit: ", Style::default().fg(Color::White)),
+            Span::styled(
+                format!("[{}/{}] ", unit_idx + 1, app.units.len()),
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::styled(
+                unit.name.clone(),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" (←/→)", Style::default().fg(Color::DarkGray)),
+        ]);
+
+        let lines = vec![
+            unit_selector,
+            Line::from(""),
+            make_field_line(UnitField::Id, "ID: ".to_string(), unit.id.clone(), Color::Cyan),
+            make_field_line(UnitField::Name, "Name: ".to_string(), unit.name.clone(), Color::Cyan),
+            make_field_line(UnitField::SpritePath, "Sprite: ".to_string(), unit.sprite_path.clone(), Color::Gray),
+            Line::from(""),
+            make_field_line(UnitField::BaseHealth, "Health: ".to_string(), format!("{:.0}", unit.base_health), Color::Red),
+            make_field_line(UnitField::BaseSpeed, "Speed: ".to_string(), format!("{:.0}", unit.base_speed), Color::Cyan),
+            make_field_line(UnitField::DamageToBase, "Damage: ".to_string(), unit.damage_to_base.to_string(), Color::Magenta),
+            make_field_line(UnitField::GoldReward, "Gold: ".to_string(), unit.gold_reward.to_string(), Color::Yellow),
+            Line::from(""),
+            make_field_line(UnitField::FrameCount, "Frames: ".to_string(), unit.frame_count.to_string(), Color::Blue),
+            make_field_line(UnitField::FrameSize, "Size: ".to_string(), format!("{}x{}", unit.frame_size[0], unit.frame_size[1]), Color::Blue),
+        ];
+
+        let title = if app.editing && is_selected {
+            "Units (Editing)"
+        } else if is_selected {
+            "Units (Enter:edit | a:new | x:del)"
+        } else {
+            "Units"
+        };
+
+        let paragraph = Paragraph::new(lines)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_style(border_style),
+            )
+            .wrap(Wrap { trim: true });
+
+        f.render_widget(paragraph, area);
+    } else {
+        let paragraph = Paragraph::new("No units. Press 'a' to add.").block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Available Units")
+                .title("Units")
                 .border_style(border_style),
-        )
-        .highlight_style(
-            Style::default()
-                .bg(Color::DarkGray)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol(">> ");
-
-    f.render_stateful_widget(list, area, &mut app.unit_list_state);
+        );
+        f.render_widget(paragraph, area);
+    }
 }
 
 fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
@@ -879,7 +1123,12 @@ where
             if let Event::Key(key) = event::read()? {
                 if app.editing {
                     match key.code {
-                        KeyCode::Enter => app.confirm_edit(),
+                        KeyCode::Enter => {
+                            match app.selected_panel {
+                                SelectedPanel::Units => app.confirm_unit_edit(),
+                                _ => app.confirm_edit(),
+                            }
+                        }
                         KeyCode::Esc => app.cancel_edit(),
                         KeyCode::Backspace => {
                             app.edit_buffer.pop();
@@ -890,13 +1139,24 @@ where
                         _ => {}
                     }
                 } else {
+                    // Reset status message to help text on navigation
+                    app.status_message = "q:quit | w:save | a:new | x:delete | Tab:switch | ↑/↓:navigate | Enter:edit".to_string();
+
                     match key.code {
                         KeyCode::Char('q') => return Ok(()),
                         KeyCode::Char('w') => app.save()?,
-                        KeyCode::Char('a') => app.add_new_wave(),
+                        KeyCode::Char('a') => {
+                            match app.selected_panel {
+                                SelectedPanel::Waves => app.add_new_wave(),
+                                SelectedPanel::Units => app.add_new_unit(),
+                                _ => {}
+                            }
+                        }
                         KeyCode::Char('x') => {
-                            if matches!(app.selected_panel, SelectedPanel::Waves) {
-                                app.delete_current_wave();
+                            match app.selected_panel {
+                                SelectedPanel::Waves => app.delete_current_wave(),
+                                SelectedPanel::Units => app.delete_current_unit(),
+                                _ => {}
                             }
                         }
                         KeyCode::Insert => {
@@ -915,28 +1175,34 @@ where
                             }
                         }
                         KeyCode::Enter => {
-                            if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
-                                app.start_editing();
+                            match app.selected_panel {
+                                SelectedPanel::WaveDetails => app.start_editing(),
+                                SelectedPanel::Units => app.start_editing_unit(),
+                                _ => {}
                             }
                         }
                         KeyCode::Down => match app.selected_panel {
                             SelectedPanel::Waves => app.next_wave(),
                             SelectedPanel::WaveDetails => app.next_field(),
-                            SelectedPanel::Units => app.next_unit(),
+                            SelectedPanel::Units => app.next_unit_field(),
                         },
                         KeyCode::Up => match app.selected_panel {
                             SelectedPanel::Waves => app.previous_wave(),
                             SelectedPanel::WaveDetails => app.prev_field(),
-                            SelectedPanel::Units => app.previous_unit(),
+                            SelectedPanel::Units => app.prev_unit_field(),
                         },
                         KeyCode::Left => {
-                            if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
-                                app.prev_spawn_field();
+                            match app.selected_panel {
+                                SelectedPanel::WaveDetails => app.prev_spawn_field(),
+                                SelectedPanel::Units => app.previous_unit(),
+                                _ => {}
                             }
                         }
                         KeyCode::Right => {
-                            if matches!(app.selected_panel, SelectedPanel::WaveDetails) {
-                                app.next_spawn_field();
+                            match app.selected_panel {
+                                SelectedPanel::WaveDetails => app.next_spawn_field(),
+                                SelectedPanel::Units => app.next_unit(),
+                                _ => {}
                             }
                         }
                         KeyCode::Tab => {
