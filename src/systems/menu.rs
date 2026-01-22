@@ -1,11 +1,108 @@
 // menu.rs - Medieval/fantasy themed menu with 9-slice buttons
-// Updated for Bevy 0.15+
+// Bevy 0.17+ Manual 9-slice from 3x3 grid spritesheets
 
 use bevy::prelude::*;
 use crate::resources::AppState;
+
 // ============================================================================
-// MENU COMPONENTS
+// 9-SLICE BUTTON SYSTEM
 // ============================================================================
+
+/// Button style variants matching spritesheet assets
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ButtonStyle {
+    #[default]
+    BigBlue,
+    BigRed,
+    SmallBlueRound,
+    SmallRedRound,
+    SmallBlueSquare,
+    SmallRedSquare,
+}
+
+impl ButtonStyle {
+    pub fn regular_texture(&self) -> &'static str {
+        match self {
+            Self::BigBlue => "UI Elements/UI Elements/Buttons/BigBlueButton_Regular.png",
+            Self::BigRed => "UI Elements/UI Elements/Buttons/BigRedButton_Regular.png",
+            Self::SmallBlueRound => "UI Elements/UI Elements/Buttons/SmallBlueRoundButton_Regular.png",
+            Self::SmallRedRound => "UI Elements/UI Elements/Buttons/SmallRedRoundButton_Regular.png",
+            Self::SmallBlueSquare => "UI Elements/UI Elements/Buttons/SmallBlueSquareButton_Regular.png",
+            Self::SmallRedSquare => "UI Elements/UI Elements/Buttons/SmallRedSquareButton_Regular.png",
+        }
+    }
+
+    pub fn pressed_texture(&self) -> &'static str {
+        match self {
+            Self::BigBlue => "UI Elements/UI Elements/Buttons/BigBlueButton_Pressed.png",
+            Self::BigRed => "UI Elements/UI Elements/Buttons/BigRedButton_Pressed.png",
+            Self::SmallBlueRound => "UI Elements/UI Elements/Buttons/SmallBlueRoundButton_Pressed.png",
+            Self::SmallRedRound => "UI Elements/UI Elements/Buttons/SmallRedRoundButton_Pressed.png",
+            Self::SmallBlueSquare => "UI Elements/UI Elements/Buttons/SmallBlueSquareButton_Pressed.png",
+            Self::SmallRedSquare => "UI Elements/UI Elements/Buttons/SmallRedSquareButton_Pressed.png",
+        }
+    }
+
+    /// Returns (tile_size, gap) for extracting tiles from the spritesheet
+    /// Big buttons: 320x320 pre-separated 3x3 grid - extract full cells
+    /// Small buttons: 128x128 single image - cut into 9 pieces
+    pub fn grid_params(&self) -> (f32, f32) {
+        match self {
+            // Big buttons are pre-separated grids, extract ~full cells with minimal gap
+            Self::BigBlue | Self::BigRed => (105.0, 2.5),
+            // Small buttons are single images, divide evenly into 9
+            _ => (42.67, 0.0),
+        }
+    }
+
+    pub fn default_size(&self) -> (Val, Val) {
+        match self {
+            Self::BigBlue | Self::BigRed => (Val::Px(280.0), Val::Px(80.0)),
+            Self::SmallBlueRound | Self::SmallRedRound => (Val::Px(200.0), Val::Px(55.0)),
+            Self::SmallBlueSquare | Self::SmallRedSquare => (Val::Px(160.0), Val::Px(45.0)),
+        }
+    }
+
+    pub fn corner_display_size(&self) -> f32 {
+        match self {
+            Self::BigBlue | Self::BigRed => 20.0,
+            _ => 14.0,
+        }
+    }
+
+    pub fn default_font_size(&self) -> f32 {
+        match self {
+            Self::BigBlue | Self::BigRed => 32.0,
+            Self::SmallBlueRound | Self::SmallRedRound => 22.0,
+            Self::SmallBlueSquare | Self::SmallRedSquare => 18.0,
+        }
+    }
+}
+
+/// Get UV rect for tile at index (0-8) in 3x3 grid
+fn tile_rect(index: usize, tile_size: f32, gap: f32) -> Rect {
+    let row = (index / 3) as f32;
+    let col = (index % 3) as f32;
+    let stride = tile_size + gap;
+    Rect::new(
+        col * stride,
+        row * stride,
+        col * stride + tile_size,
+        row * stride + tile_size,
+    )
+}
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
+
+#[derive(Component)]
+pub struct UIButton {
+    pub style: ButtonStyle,
+}
+
+#[derive(Component)]
+struct NineSlicePart;
 
 #[derive(Component)]
 struct MenuUI;
@@ -20,7 +117,7 @@ struct SettingsButton;
 struct QuitButton;
 
 // ============================================================================
-// MENU PLUGIN
+// PLUGIN
 // ============================================================================
 
 pub struct MenuPlugin;
@@ -28,27 +125,25 @@ pub struct MenuPlugin;
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(OnEnter(AppState::MainMenu), setup_main_menu)
+            .add_systems(OnEnter(AppState::MainMenu), setup_menu)
             .add_systems(
                 Update,
                 (
-                    handle_play_button,
-                    handle_settings_button,
-                    handle_quit_button,
-                    update_button_images,
-                )
-                    .run_if(in_state(AppState::MainMenu)),
+                    button_interaction::<PlayButton>,
+                    button_interaction::<SettingsButton>,
+                    button_interaction::<QuitButton>,
+                    update_nine_slice_textures,
+                ).run_if(in_state(AppState::MainMenu)),
             )
             .add_systems(OnExit(AppState::MainMenu), cleanup_menu);
     }
 }
 
 // ============================================================================
-// MENU SETUP SYSTEM
+// MENU SETUP
 // ============================================================================
 
-fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // Root container with background
+fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn((
             Node {
@@ -57,233 +152,184 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
-                row_gap: Val::Px(40.0),
+                row_gap: Val::Px(18.0),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.28, 0.42, 0.45)), // Teal background like your image
+            BackgroundColor(Color::srgb(0.15, 0.28, 0.32)),
             MenuUI,
         ))
         .with_children(|parent| {
             // Title
             parent.spawn((
                 Text::new("TOWER DEFENSE MMO"),
-                TextFont {
-                    font_size: 72.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.85, 0.9, 0.9)),
+                TextFont { font_size: 48.0, ..default() },
+                TextColor(Color::srgb(0.92, 0.96, 0.96)),
+                Node { margin: UiRect::bottom(Val::Px(5.0)), ..default() },
             ));
 
             // Subtitle
             parent.spawn((
                 Text::new("Defend Together!"),
-                TextFont {
-                    font_size: 28.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.7, 0.8, 0.8)),
-                Node {
-                    margin: UiRect::bottom(Val::Px(30.0)),
-                    ..default()
-                },
+                TextFont { font_size: 18.0, ..default() },
+                TextColor(Color::srgb(0.7, 0.78, 0.78)),
+                Node { margin: UiRect::bottom(Val::Px(25.0)), ..default() },
             ));
 
-            // Play Button (Big Blue Square - stretched with 9-slice)
-            parent
-                .spawn((
-                    Button,
-                    ImageNode {
-                        image: asset_server.load("UI Elements/UI Elements/Buttons/BigBlueButton_Regular.png"),
-                        image_mode: NodeImageMode::Sliced(TextureSlicer {
-                            border: BorderRect::all(8.0), // Small border for thin frames
-                            center_scale_mode: SliceScaleMode::Stretch,
-                            sides_scale_mode: SliceScaleMode::Stretch,
-                            max_corner_scale: 1.0,
-                        }),
-                        ..default()
-                    },
-                    Node {
-                        width: Val::Px(350.0),
-                        height: Val::Px(100.0),
-                        align_items: AlignItems::Center,
-                        justify_content: JustifyContent::Center,
-                        ..default()
-                    },
-                    PlayButton,
-                ))
-                .with_children(|button| {
-                    button.spawn((
-                        Text::new("PLAY"),
-                        TextFont {
-                            font_size: 48.0,
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                    ));
-                });
-
-            // Settings Button (Small Blue Round)
-            parent
-                .spawn((
-                    Button,
-                    ImageNode {
-                        image: asset_server.load("UI Elements/UI Elements/Buttons/SmallBlueRoundButton_Regular.png"),
-                        image_mode: NodeImageMode::Sliced(TextureSlicer {
-                            border: BorderRect::all(10.0), // Adjust for round buttons
-                            center_scale_mode: SliceScaleMode::Stretch,
-                            sides_scale_mode: SliceScaleMode::Stretch,
-                            max_corner_scale: 1.0,
-                        }),
-                        ..default()
-                    },
-                    Node {
-                        width: Val::Px(280.0),
-                        height: Val::Px(75.0),
-                        align_items: AlignItems::Center,
-                        justify_content: JustifyContent::Center,
-                        ..default()
-                    },
-                    SettingsButton,
-                ))
-                .with_children(|button| {
-                    button.spawn((
-                        Text::new("SETTINGS"),
-                        TextFont {
-                            font_size: 32.0,
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                    ));
-                });
-
-            // Quit Button (Small Red Round)
-            parent
-                .spawn((
-                    Button,
-                    ImageNode {
-                        image: asset_server.load("UI Elements/UI Elements/Buttons/SmallRedRoundButton_Regular.png"),
-                        image_mode: NodeImageMode::Sliced(TextureSlicer {
-                            border: BorderRect::all(10.0),
-                            center_scale_mode: SliceScaleMode::Stretch,
-                            sides_scale_mode: SliceScaleMode::Stretch,
-                            max_corner_scale: 1.0,
-                        }),
-                        ..default()
-                    },
-                    Node {
-                        width: Val::Px(280.0),
-                        height: Val::Px(75.0),
-                        align_items: AlignItems::Center,
-                        justify_content: JustifyContent::Center,
-                        ..default()
-                    },
-                    QuitButton,
-                ))
-                .with_children(|button| {
-                    button.spawn((
-                        Text::new("QUIT"),
-                        TextFont {
-                            font_size: 32.0,
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                    ));
-                });
+            // Buttons
+            spawn_nine_slice_button(parent, &asset_server, ButtonStyle::BigBlue, "PLAY", PlayButton);
+            spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallBlueRound, "SETTINGS", SettingsButton);
+            spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallRedRound, "QUIT", QuitButton);
         });
 }
 
+fn spawn_nine_slice_button<M: Component>(
+    parent: &mut ChildSpawnerCommands,
+    asset_server: &AssetServer,
+    style: ButtonStyle,
+    label: &str,
+    marker: M,
+) {
+    let (width, height) = style.default_size();
+    let corner = style.corner_display_size();
+    let (tile_size, gap) = style.grid_params();
+    let texture = asset_server.load(style.regular_texture());
+    let font_size = style.default_font_size();
+
+    parent
+        .spawn((
+            Button,
+            Node {
+                width,
+                height,
+                display: Display::Grid,
+                grid_template_columns: vec![
+                    GridTrack::px(corner),
+                    GridTrack::fr(1.0),
+                    GridTrack::px(corner),
+                ],
+                grid_template_rows: vec![
+                    GridTrack::px(corner),
+                    GridTrack::fr(1.0),
+                    GridTrack::px(corner),
+                ],
+                ..default()
+            },
+            UIButton { style },
+            marker,
+        ))
+        .with_children(|btn| {
+            // Row 0: top-left, top, top-right
+            spawn_grid_tile(btn, texture.clone(), tile_rect(0, tile_size, gap));
+            spawn_grid_tile(btn, texture.clone(), tile_rect(1, tile_size, gap));
+            spawn_grid_tile(btn, texture.clone(), tile_rect(2, tile_size, gap));
+
+            // Row 1: left, center (with text), right
+            spawn_grid_tile(btn, texture.clone(), tile_rect(3, tile_size, gap));
+
+            // Center tile with text
+            btn.spawn((
+                ImageNode {
+                    image: texture.clone(),
+                    rect: Some(tile_rect(4, tile_size, gap)),
+                    ..default()
+                },
+                Node {
+                    display: Display::Flex,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                NineSlicePart,
+            )).with_children(|center| {
+                center.spawn((
+                    Text::new(label.to_string()),
+                    TextFont { font_size, ..default() },
+                    TextColor(Color::WHITE),
+                ));
+            });
+
+            spawn_grid_tile(btn, texture.clone(), tile_rect(5, tile_size, gap));
+
+            // Row 2: bottom-left, bottom, bottom-right
+            spawn_grid_tile(btn, texture.clone(), tile_rect(6, tile_size, gap));
+            spawn_grid_tile(btn, texture.clone(), tile_rect(7, tile_size, gap));
+            spawn_grid_tile(btn, texture.clone(), tile_rect(8, tile_size, gap));
+        });
+}
+
+fn spawn_grid_tile(
+    parent: &mut ChildSpawnerCommands,
+    texture: Handle<Image>,
+    rect: Rect,
+) {
+    parent.spawn((
+        ImageNode {
+            image: texture,
+            rect: Some(rect),
+            ..default()
+        },
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        },
+        NineSlicePart,
+    ));
+}
+
 // ============================================================================
-// BUTTON INTERACTION SYSTEMS
+// INTERACTIONS
 // ============================================================================
 
-fn handle_play_button(
-    interaction_query: Query<&Interaction, (Changed<Interaction>, With<PlayButton>)>,
+fn button_interaction<M: Component>(
+    query: Query<&Interaction, (Changed<Interaction>, With<M>)>,
     mut next_state: ResMut<NextState<AppState>>,
+    mut exit: EventWriter<AppExit>,
 ) {
-    for interaction in &interaction_query {
+    for interaction in &query {
         if *interaction == Interaction::Pressed {
-            info!("Play button pressed!");
-            next_state.set(AppState::InGame);
+            if std::any::type_name::<M>().contains("PlayButton") {
+                next_state.set(AppState::InGame);
+            } else if std::any::type_name::<M>().contains("QuitButton") {
+                exit.write(AppExit::Success);
+            } else if std::any::type_name::<M>().contains("SettingsButton") {
+                info!("Settings pressed");
+            }
         }
     }
 }
 
-fn handle_settings_button(
-    interaction_query: Query<&Interaction, (Changed<Interaction>, With<SettingsButton>)>,
-) {
-    for interaction in &interaction_query {
-        if *interaction == Interaction::Pressed {
-            info!("Settings button pressed!");
-        }
-    }
-}
-
-fn handle_quit_button(
-    interaction_query: Query<&Interaction, (Changed<Interaction>, With<QuitButton>)>,
-    mut exit: MessageWriter<AppExit>,
-) {
-    for interaction in &interaction_query {
-        if *interaction == Interaction::Pressed {
-            info!("Quit button pressed!");
-            exit.write(AppExit::Success);
-        }
-    }
-}
-
-// Change button images based on interaction state
-fn update_button_images(
+fn update_nine_slice_textures(
     asset_server: Res<AssetServer>,
-    mut play_query: Query<(&Interaction, &mut ImageNode), (Changed<Interaction>, With<PlayButton>)>,
-    mut settings_query: Query<(&Interaction, &mut ImageNode), (Changed<Interaction>, With<SettingsButton>, Without<PlayButton>)>,
-    mut quit_query: Query<(&Interaction, &mut ImageNode), (Changed<Interaction>, With<QuitButton>, Without<PlayButton>, Without<SettingsButton>)>,
+    button_query: Query<(&Interaction, &UIButton, &Children), Changed<Interaction>>,
+    children_query: Query<&Children>,
+    mut image_query: Query<&mut ImageNode, With<NineSlicePart>>,
 ) {
-    // Update Play button
-    for (interaction, mut image_node) in &mut play_query {
-        let new_image = match *interaction {
-            Interaction::Pressed => asset_server.load("UI Elements/UI Elements/Buttons/BigBlueButton_Pressed.png"),
-            _ => asset_server.load("UI Elements/UI Elements/Buttons/BigBlueButton_Regular.png"),
+    for (interaction, ui_button, children) in &button_query {
+        let path = match interaction {
+            Interaction::Pressed => ui_button.style.pressed_texture(),
+            _ => ui_button.style.regular_texture(),
         };
-
-        image_node.image = new_image;
-        // Keep the 9-slice settings
-        image_node.image_mode = NodeImageMode::Sliced(TextureSlicer {
-            border: BorderRect::all(8.0),
-            center_scale_mode: SliceScaleMode::Stretch,
-            sides_scale_mode: SliceScaleMode::Stretch,
-            max_corner_scale: 1.0,
-        });
+        let texture = asset_server.load(path);
+        update_children_textures(children, &children_query, &mut image_query, &texture);
     }
+}
 
-    // Update Settings button
-    for (interaction, mut image_node) in &mut settings_query {
-        let new_image = match *interaction {
-            Interaction::Pressed => asset_server.load("UI Elements/UI Elements/Buttons/SmallBlueRoundButton_Pressed.png"),
-            _ => asset_server.load("UI Elements/UI Elements/Buttons/SmallBlueRoundButton_Regular.png"),
-        };
-
-        image_node.image = new_image;
-        image_node.image_mode = NodeImageMode::Sliced(TextureSlicer {
-            border: BorderRect::all(10.0),
-            center_scale_mode: SliceScaleMode::Stretch,
-            sides_scale_mode: SliceScaleMode::Stretch,
-            max_corner_scale: 1.0,
-        });
-    }
-
-    // Update Quit button
-    for (interaction, mut image_node) in &mut quit_query {
-        let new_image = match *interaction {
-            Interaction::Pressed => asset_server.load("UI Elements/UI Elements/Buttons/SmallRedRoundButton_Pressed.png"),
-            _ => asset_server.load("UI Elements/UI Elements/Buttons/SmallRedRoundButton_Regular.png"),
-        };
-
-        image_node.image = new_image;
-        image_node.image_mode = NodeImageMode::Sliced(TextureSlicer {
-            border: BorderRect::all(10.0),
-            center_scale_mode: SliceScaleMode::Stretch,
-            sides_scale_mode: SliceScaleMode::Stretch,
-            max_corner_scale: 1.0,
-        });
+fn update_children_textures(
+    children: &Children,
+    children_query: &Query<&Children>,
+    image_query: &mut Query<&mut ImageNode, With<NineSlicePart>>,
+    texture: &Handle<Image>,
+) {
+    for child in children.iter() {
+        if let Ok(mut img) = image_query.get_mut(child) {
+            img.image = texture.clone();
+        }
+        if let Ok(grandchildren) = children_query.get(child) {
+            update_children_textures(grandchildren, children_query, image_query, texture);
+        }
     }
 }
 
@@ -292,18 +338,3 @@ fn cleanup_menu(mut commands: Commands, query: Query<Entity, With<MenuUI>>) {
         commands.entity(entity).despawn();
     }
 }
-
-// ============================================================================
-// USAGE INSTRUCTIONS
-// ============================================================================
-
-// Place button assets in: assets/UI Elements/UI Elements/Buttons/
-//
-// IMPORTANT: Adjust the `border` values in TextureSlicer based on your images!
-// The border value defines how many pixels from each edge should NOT be stretched.
-//
-// For example, if your button has 20px decorative corners, use:
-// BorderRect::all(20.0)
-//
-// If corners are different sizes, use:
-// BorderRect { left: 20.0, right: 20.0, top: 15.0, bottom: 15.0 }
