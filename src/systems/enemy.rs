@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::components::{AnimationTimer, Enemy, HealthBar};
+use crate::components::{AnimationTimer, Enemy, HealthBar, HealthBarFill};
 use crate::constants::{SCALED_TILE_SIZE, WARRIOR_FRAME_SIZE};
 use crate::resources::{EnemySpawner, GameState, PathWaypoints, WaveConfigs};
 
@@ -96,20 +96,7 @@ pub fn spawn_enemies(
                     ))
                     .id();
 
-                // Spawn health bar above enemy as child
-                let health_bar = commands
-                    .spawn((
-                        Sprite {
-                            color: Color::srgb(0.0, 1.0, 0.0), // Green
-                            custom_size: Some(Vec2::new(SCALED_TILE_SIZE, 4.0)),
-                            ..default()
-                        },
-                        Transform::from_xyz(0.0, SCALED_TILE_SIZE * 0.6, 0.1),
-                        HealthBar { max_health },
-                    ))
-                    .id();
-
-                commands.entity(enemy_entity).add_child(health_bar);
+                spawn_health_bar(&mut commands, &asset_server, enemy_entity, max_health, SCALED_TILE_SIZE);
 
                 spawner.enemies_spawned += 1;
 
@@ -131,6 +118,60 @@ pub fn spawn_enemies(
             }
         }
     }
+}
+fn spawn_health_bar(
+    commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
+    parent_entity: Entity,
+    max_health: f32,
+    scaled_tile_size: f32,
+) -> Entity {
+
+    // The health bar background is 320x64
+    // Make it much bigger for visibility
+    let bar_width = scaled_tile_size * 18.0; // Increased from 5 to 10
+    let bar_height = bar_width * (64.0 / 320.0); // Maintain aspect ratio
+
+    // Make the fill thicker and more visible
+    let fill_height = 9.0;
+
+    // Create the background sprite (the border/frame)
+    let health_bar_bg = commands
+        .spawn((
+            Sprite {
+                image: asset_server.load("UI Elements/UI Elements/Bars/SmallBar_Base.png"),
+                color: Color::srgb(0.3, 0.3, 0.3), // Gray background as fallback
+                custom_size: Some(Vec2::new(bar_width, bar_height)),
+                ..default()
+            },
+            Transform::from_xyz(0.0, scaled_tile_size * 2.5, 5.0), // Position above enemy, higher z
+            HealthBar { max_health },
+        ))
+        .id();
+
+    // Create the fill (green bar that shrinks)
+    // Position it centered within the background
+    // The actual fill area inside the frame is much smaller than the total width
+    let fill_width = bar_width * 0.2; // Much smaller to fit inside the frame border
+    let health_bar_fill = commands
+        .spawn((
+            Sprite {
+                color: Color::srgb(0.0, 1.0, 0.0), // Green
+                custom_size: Some(Vec2::new(fill_width, fill_height)),
+                ..default()
+            },
+            Transform::from_xyz(0.0, 0.0, 0.1), // Centered on the background
+            HealthBarFill { max_width: fill_width },
+        ))
+        .id();
+
+    // Make fill a child of background
+    commands.entity(health_bar_bg).add_child(health_bar_fill);
+
+    // Make background a child of enemy
+    commands.entity(parent_entity).add_child(health_bar_bg);
+
+    health_bar_bg
 }
 
 pub fn move_enemies(

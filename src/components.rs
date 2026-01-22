@@ -38,6 +38,11 @@ pub struct HealthBar {
 }
 
 #[derive(Component)]
+pub struct HealthBarFill {
+    pub max_width: f32,
+}
+
+#[derive(Component)]
 pub struct Castle;
 
 #[derive(Component)]
