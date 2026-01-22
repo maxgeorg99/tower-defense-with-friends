@@ -24,7 +24,7 @@ use std::{
     path::Path,
     time::Duration,
 };
-
+use std::io::empty;
 // === APP STATE ===
 
 enum SelectedPanel {
@@ -90,6 +90,7 @@ enum UnitField {
     Id,
     Name,
     SpritePath,
+    AvatarPath,
     BaseHealth,
     BaseSpeed,
     DamageToBase,
@@ -104,6 +105,7 @@ impl UnitField {
             UnitField::Id,
             UnitField::Name,
             UnitField::SpritePath,
+            UnitField::AvatarPath,
             UnitField::BaseHealth,
             UnitField::BaseSpeed,
             UnitField::DamageToBase,
@@ -556,6 +558,7 @@ impl App {
                 UnitField::Id => unit.id.clone(),
                 UnitField::Name => unit.name.clone(),
                 UnitField::SpritePath => unit.sprite_path.clone(),
+                UnitField::AvatarPath => unit.avatar_path.clone().unwrap_or(String::new()),
                 UnitField::BaseHealth => unit.base_health.to_string(),
                 UnitField::BaseSpeed => unit.base_speed.to_string(),
                 UnitField::DamageToBase => unit.damage_to_base.to_string(),
@@ -593,6 +596,15 @@ impl App {
                         Ok("Sprite path updated".to_string())
                     } else {
                         Err("Sprite path cannot be empty".to_string())
+                    }
+                }
+                UnitField::AvatarPath => {
+                    if !self.edit_buffer.is_empty() {
+                        self.units[unit_idx].avatar_path = Option::from(self.edit_buffer.clone());
+                        self.load_selected_unit_animation();
+                        Ok("Avatar path updated".to_string())
+                    } else {
+                        Err("Avatar path cannot be empty".to_string())
                     }
                 }
                 UnitField::BaseHealth => {
@@ -672,6 +684,7 @@ impl App {
             id: new_unit_id.clone(),
             name: format!("New Unit {}", self.units.len() + 1),
             sprite_path: "Units/Blue Units/Warrior/Warrior_Blue.png".to_string(),
+            avatar_path: Option::from("UI Elements/UI Elements/Human Avatars/Avatar_Blue.png".to_string()),
             base_health: 100.0,
             base_speed: 50.0,
             damage_to_base: 1,
@@ -1036,6 +1049,7 @@ fn render_units_list(f: &mut Frame, app: &mut App, area: Rect) {
             make_field_line(UnitField::Id, "ID: ".to_string(), unit.id.clone(), Color::Cyan),
             make_field_line(UnitField::Name, "Name: ".to_string(), unit.name.clone(), Color::Cyan),
             make_field_line(UnitField::SpritePath, "Sprite: ".to_string(), unit.sprite_path.clone(), Color::Gray),
+            make_field_line(UnitField::AvatarPath, "Avatar: ".to_string(), unit.avatar_path.clone().unwrap_or(String::new()), Color::Gray),
             Line::from(""),
             make_field_line(UnitField::BaseHealth, "Health: ".to_string(), format!("{:.0}", unit.base_health), Color::Red),
             make_field_line(UnitField::BaseSpeed, "Speed: ".to_string(), format!("{:.0}", unit.base_speed), Color::Cyan),
