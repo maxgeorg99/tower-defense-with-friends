@@ -1,14 +1,6 @@
-// menu.rs - Medieval/fantasy themed menu with 9-slice buttons
-// Bevy 0.17+ Manual 9-slice from 3x3 grid spritesheets
-
 use bevy::prelude::*;
 use crate::resources::AppState;
 
-// ============================================================================
-// 9-SLICE BUTTON SYSTEM
-// ============================================================================
-
-/// Button style variants matching spritesheet assets
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ButtonStyle {
     #[default]
@@ -43,14 +35,9 @@ impl ButtonStyle {
         }
     }
 
-    /// Returns (tile_size, gap) for extracting tiles from the spritesheet
-    /// Big buttons: 320x320 pre-separated 3x3 grid - extract full cells
-    /// Small buttons: 128x128 single image - cut into 9 pieces
     pub fn grid_params(&self) -> (f32, f32) {
         match self {
-            // Big buttons are pre-separated grids, extract ~full cells with minimal gap
             Self::BigBlue | Self::BigRed => (105.0, 2.5),
-            // Small buttons are single images, divide evenly into 9
             _ => (42.67, 0.0),
         }
     }
@@ -79,7 +66,6 @@ impl ButtonStyle {
     }
 }
 
-/// Get UV rect for tile at index (0-8) in 3x3 grid
 fn tile_rect(index: usize, tile_size: f32, gap: f32) -> Rect {
     let row = (index / 3) as f32;
     let col = (index % 3) as f32;
@@ -91,10 +77,6 @@ fn tile_rect(index: usize, tile_size: f32, gap: f32) -> Rect {
         row * stride + tile_size,
     )
 }
-
-// ============================================================================
-// COMPONENTS
-// ============================================================================
 
 #[derive(Component)]
 pub struct UIButton {
@@ -116,10 +98,6 @@ struct SettingsButton;
 #[derive(Component)]
 struct QuitButton;
 
-// ============================================================================
-// PLUGIN
-// ============================================================================
-
 pub struct MenuPlugin;
 
 impl Plugin for MenuPlugin {
@@ -138,10 +116,6 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(AppState::MainMenu), cleanup_menu);
     }
 }
-
-// ============================================================================
-// MENU SETUP
-// ============================================================================
 
 fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
@@ -176,7 +150,7 @@ fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
             ));
 
             // Buttons
-            spawn_nine_slice_button(parent, &asset_server, ButtonStyle::BigBlue, "PLAY", PlayButton);
+            spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallBlueRound, "PLAY", PlayButton);
             spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallBlueRound, "SETTINGS", SettingsButton);
             spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallRedRound, "QUIT", QuitButton);
         });
@@ -218,15 +192,12 @@ fn spawn_nine_slice_button<M: Component>(
             marker,
         ))
         .with_children(|btn| {
-            // Row 0: top-left, top, top-right
             spawn_grid_tile(btn, texture.clone(), tile_rect(0, tile_size, gap));
             spawn_grid_tile(btn, texture.clone(), tile_rect(1, tile_size, gap));
             spawn_grid_tile(btn, texture.clone(), tile_rect(2, tile_size, gap));
 
-            // Row 1: left, center (with text), right
             spawn_grid_tile(btn, texture.clone(), tile_rect(3, tile_size, gap));
 
-            // Center tile with text
             btn.spawn((
                 ImageNode {
                     image: texture.clone(),
@@ -252,7 +223,6 @@ fn spawn_nine_slice_button<M: Component>(
 
             spawn_grid_tile(btn, texture.clone(), tile_rect(5, tile_size, gap));
 
-            // Row 2: bottom-left, bottom, bottom-right
             spawn_grid_tile(btn, texture.clone(), tile_rect(6, tile_size, gap));
             spawn_grid_tile(btn, texture.clone(), tile_rect(7, tile_size, gap));
             spawn_grid_tile(btn, texture.clone(), tile_rect(8, tile_size, gap));
@@ -278,10 +248,6 @@ fn spawn_grid_tile(
         NineSlicePart,
     ));
 }
-
-// ============================================================================
-// INTERACTIONS
-// ============================================================================
 
 fn button_interaction<M: Component>(
     query: Query<&Interaction, (Changed<Interaction>, With<M>)>,

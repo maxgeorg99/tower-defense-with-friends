@@ -13,7 +13,6 @@ mod events;
 mod map;
 mod resources;
 mod systems;
-use menu::MenuPlugin;
 use config::{TowersConfig, UnitsConfig, WavesConfig};
 
 use ::bevy::prelude::*;
@@ -35,7 +34,6 @@ use resources::*;
 use systems::*;
 
 fn main() {
-    // Load initial configs
     let units = UnitsConfig::load()
         .expect("Failed to load units.toml")
         .units;
@@ -46,36 +44,29 @@ fn main() {
         .expect("Failed to load towers.toml")
         .towers;
 
-    // Initialize spawner with first wave config
     let spawner = if let Some(first_wave) = waves.first() {
         EnemySpawner::from_wave_config(first_wave)
     } else {
         panic!("No waves defined in waves.toml!");
     };
 
-    // SpacetimeDB connection config from environment
     let stdb_uri = std::env::var("SPACETIMEDB_URI")
         .unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
     let stdb_module = std::env::var("SPACETIMEDB_MODULE")
         .unwrap_or_else(|_| "td-mmo".to_string());
-    // Try to load token from env var first, then from file
     let stdb_token = std::env::var("SPACETIMEDB_TOKEN")
         .ok()
         .or_else(load_token_from_file);
-    let require_auth = std::env::var("SPACETIMEDB_REQUIRE_AUTH")
-        .map(|v| v == "1" || v.to_lowercase() == "true")
-        .unwrap_or(false);
 
-    // Determine initial state based on auth
-    let has_token = stdb_token.is_some();
     let initial_state = AppState::MainMenu;
 
     let mut app = App::new();
 
-    // Add core plugins
     app.add_plugins(BevyPlugin)
         .add_plugins(EventPlugin)
-        .add_plugins(MenuPlugin);
+        .add_plugins(MenuPlugin)
+        .add_plugins(CursorPlugin)
+    ;
 
     // Store connection config for deferred connection
     app.insert_resource(StdbConfig {
@@ -83,13 +74,6 @@ fn main() {
         module: stdb_module.clone(),
         token: stdb_token.clone(),
     });
-
-    // Always add the SpacetimeDB plugin with delayed connect
-    // Connection will be established via connect_with_token() after auth or on game start
-    info!(
-        "Setting up SpacetimeDB plugin with delayed connect (uri: {}, module: {})",
-        stdb_uri, stdb_module
-    );
 
     let stdb_plugin = StdbPlugin::<DbConnection, RemoteModule>::default()
         .with_uri(&stdb_uri)
@@ -101,13 +85,10 @@ fn main() {
     app.add_plugins(stdb_plugin);
 
     app
-    // State management
     .insert_state(initial_state)
     .init_resource::<GameState>()
-    // Auth resources
     .init_resource::<AuthConfig>()
     .init_resource::<AuthState>()
-    // Game resources
     .insert_resource(spawner)
     .insert_resource(PathWaypoints {
         points: create_path_waypoints(),
@@ -119,9 +100,7 @@ fn main() {
         position: Vec2::ZERO,
     })
     .insert_resource(FogOfWar::new())
-    // Camera setup runs on startup (needed for all states)
     .add_systems(Startup, setup_camera)
-    // Login screen systems
     .add_systems(OnEnter(AppState::Login), setup_login_screen)
     .add_systems(
         Update,
@@ -134,9 +113,7 @@ fn main() {
             .run_if(in_state(AppState::Login)),
     )
     .add_systems(OnExit(AppState::Login), cleanup_login_screen)
-    // Game setup when entering InGame state
     .add_systems(OnEnter(AppState::InGame), (connect_to_spacetimedb, setup_game, setup_fog_of_war, setup_online_users_ui).chain())
-    // SpacetimeDB connection handling systems (always running)
     .add_systems(
         Update,
         (
@@ -149,7 +126,6 @@ fn main() {
             update_online_users_ui,
         ),
     )
-    // Game systems (only in InGame state)
     .add_systems(
         Update,
         (

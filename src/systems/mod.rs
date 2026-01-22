@@ -8,6 +8,7 @@ pub mod setup;
 pub mod tower;
 pub mod ui;
 pub mod menu;
+pub mod cursor;
 
 pub use camera::*;
 pub use enemy::*;
@@ -18,3 +19,5 @@ pub use projectile::*;
 pub use setup::*;
 pub use tower::*;
 pub use ui::*;
+pub use menu::*;
+pub use cursor::*;
