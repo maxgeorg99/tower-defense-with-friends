@@ -5,7 +5,7 @@ pub struct UnitType {
     pub id: String,
     pub name: String,
     pub sprite_path: String,
-    pub avatar_path: Option<String>,
+    pub avatar_path: String,
     pub base_health: f32,
     pub base_speed: f32,
     pub damage_to_base: i32,

@@ -25,6 +25,7 @@ use std::{
     time::Duration,
 };
 use std::io::empty;
+use ratatui_image::protocol::StatefulProtocol;
 // === APP STATE ===
 
 enum SelectedPanel {
@@ -148,6 +149,7 @@ struct App {
     edit_buffer: String,
     picker: Picker,
     unit_animation: Option<Animation>,
+    unit_avatar: Option<StatefulProtocol>,
 }
 
 impl App {
@@ -175,6 +177,7 @@ impl App {
             edit_buffer: String::new(),
             picker: Picker::from_query_stdio().unwrap_or(Picker::halfblocks()),
             unit_animation: None,
+            unit_avatar: None,
         };
 
         if !app.waves.is_empty() {
@@ -186,6 +189,7 @@ impl App {
             app.unit_list_state.select(Some(0));
             app.current_unit = Some(app.units[0].clone());
             app.load_selected_unit_animation();
+            app.load_selected_unit_avatar();
         }
 
         Ok(app)
@@ -236,6 +240,7 @@ impl App {
         self.current_unit = Some(self.units[i].clone());
         self.selected_unit_field = UnitField::Id;
         self.load_selected_unit_animation();
+        self.load_selected_unit_avatar();
     }
 
     fn previous_unit(&mut self) {
@@ -253,8 +258,27 @@ impl App {
         self.current_unit = Some(self.units[i].clone());
         self.selected_unit_field = UnitField::Id;
         self.load_selected_unit_animation();
+        self.load_selected_unit_avatar();
     }
 
+    fn load_selected_unit_avatar(&mut self) {
+        if let Some(idx) = self.unit_list_state.selected() {
+            if let Some(unit) = self.units.get(idx) {
+                let avatar_path = format!("assets/{}", unit.avatar_path);
+                if let Ok(dyn_img) = image::ImageReader::open(&avatar_path)
+                    .and_then(|r| r.decode().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)))
+                {
+                    // Crop to first frame (assuming square frames based on height)
+                    let height = dyn_img.height();
+                    let frame_width = height; // Assume square frames
+                    let cropped = dyn_img.crop_imm(0, 0, frame_width, height);
+                    self.unit_avatar = Some(self.picker.new_resize_protocol(cropped));
+                } else {
+                    self.unit_avatar = None;
+                }
+            }
+        }
+    }
     fn load_selected_unit_animation(&mut self) {
         if let Some(idx) = self.unit_list_state.selected() {
             if let Some(unit) = self.units.get(idx) {
@@ -558,7 +582,7 @@ impl App {
                 UnitField::Id => unit.id.clone(),
                 UnitField::Name => unit.name.clone(),
                 UnitField::SpritePath => unit.sprite_path.clone(),
-                UnitField::AvatarPath => unit.avatar_path.clone().unwrap_or(String::new()),
+                UnitField::AvatarPath => unit.avatar_path.clone(),
                 UnitField::BaseHealth => unit.base_health.to_string(),
                 UnitField::BaseSpeed => unit.base_speed.to_string(),
                 UnitField::DamageToBase => unit.damage_to_base.to_string(),
@@ -600,8 +624,8 @@ impl App {
                 }
                 UnitField::AvatarPath => {
                     if !self.edit_buffer.is_empty() {
-                        self.units[unit_idx].avatar_path = Option::from(self.edit_buffer.clone());
-                        self.load_selected_unit_animation();
+                        self.units[unit_idx].avatar_path = self.edit_buffer.clone();
+                       self.load_selected_unit_avatar();();
                         Ok("Avatar path updated".to_string())
                     } else {
                         Err("Avatar path cannot be empty".to_string())
@@ -684,7 +708,7 @@ impl App {
             id: new_unit_id.clone(),
             name: format!("New Unit {}", self.units.len() + 1),
             sprite_path: "Units/Blue Units/Warrior/Warrior_Blue.png".to_string(),
-            avatar_path: Option::from("UI Elements/UI Elements/Human Avatars/Avatar_Blue.png".to_string()),
+            avatar_path: "UI Elements/UI Elements/Human Avatars/Avatar_Blue.png".to_string(),
             base_health: 100.0,
             base_speed: 50.0,
             damage_to_base: 1,
@@ -697,6 +721,7 @@ impl App {
         self.current_unit = Some(new_unit);
         self.selected_unit_field = UnitField::Id;
         self.load_selected_unit_animation();
+        self.load_selected_unit_avatar();
         self.status_message = format!("Added {}", new_unit_id);
     }
 
@@ -715,6 +740,7 @@ impl App {
                     self.unit_list_state.select(Some(new_idx));
                     self.current_unit = Some(self.units[new_idx].clone());
                     self.load_selected_unit_animation();
+                    self.load_selected_unit_avatar();
                 }
             }
         }
@@ -746,11 +772,41 @@ fn ui(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Length(12), Constraint::Min(0)])
         .split(main_chunks[2]);
 
-    render_unit_animation(f, app, units_chunks[0]);
+    let image_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(16), Constraint::Min(0)])
+        .split(units_chunks[0]);
+
+    render_unit_avatar(f, app, image_chunks[0]);
+    render_unit_animation(f, app, image_chunks[1]);
     render_units_list(f, app, units_chunks[1]);
     render_status_bar(f, app, chunks[1]);
 }
+fn render_unit_avatar(f: &mut Frame, app: &mut App, area: Rect) {
+    let is_selected = matches!(app.selected_panel, SelectedPanel::Units);
+    let border_style = if is_selected {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default()
+    };
 
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Unit Avatar")
+        .border_style(border_style);
+
+    let inner_area = block.inner(area);
+    f.render_widget(block, area);
+
+    if let Some(ref mut image_protocol) = app.unit_avatar {
+        let image_widget = StatefulImage::default();
+        f.render_stateful_widget(image_widget, inner_area, image_protocol);
+    } else {
+        let placeholder = Paragraph::new("No image available")
+            .style(Style::default().fg(Color::DarkGray));
+        f.render_widget(placeholder, inner_area);
+    }
+}
 fn render_waves_list(f: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = app
         .waves
@@ -1049,7 +1105,7 @@ fn render_units_list(f: &mut Frame, app: &mut App, area: Rect) {
             make_field_line(UnitField::Id, "ID: ".to_string(), unit.id.clone(), Color::Cyan),
             make_field_line(UnitField::Name, "Name: ".to_string(), unit.name.clone(), Color::Cyan),
             make_field_line(UnitField::SpritePath, "Sprite: ".to_string(), unit.sprite_path.clone(), Color::Gray),
-            make_field_line(UnitField::AvatarPath, "Avatar: ".to_string(), unit.avatar_path.clone().unwrap_or(String::new()), Color::Gray),
+            make_field_line(UnitField::AvatarPath, "Avatar: ".to_string(), unit.avatar_path.clone(), Color::Gray),
             Line::from(""),
             make_field_line(UnitField::BaseHealth, "Health: ".to_string(), format!("{:.0}", unit.base_health), Color::Red),
             make_field_line(UnitField::BaseSpeed, "Speed: ".to_string(), format!("{:.0}", unit.base_speed), Color::Cyan),
