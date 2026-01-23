@@ -1,5 +1,5 @@
 use log::info;
-use spacetimedb::{Identity, JwtClaims, ReducerContext, Table, Timestamp, ViewContext};
+use spacetimedb::{Identity, JwtClaims, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 use serde::{Deserialize, Serialize};
 
 #[spacetimedb::table(name = user, public)]
@@ -7,10 +7,24 @@ pub struct User {
     #[primary_key]
     identity: Identity,
     name: Option<String>,
-    email: Option<String>,
     online: bool,
 }
 
+#[spacetimedb::table(name = player, public)]
+pub struct Player {
+    #[primary_key]
+    identity: Identity,
+    name: String,
+    color: Color,
+}
+
+#[derive(SpacetimeType)]
+pub enum Color {
+    Blue,
+    Yellow,
+    Purple,
+    Black
+}
 #[spacetimedb::table(name = message, public)]
 pub struct Message {
     sender: Identity,
@@ -130,7 +144,6 @@ pub fn identity_connected(ctx: &ReducerContext) {
             online: true,
             // Keep existing data if already set, otherwise use JWT data
             name: user.name.or(name),
-            email: user.email.or(email),
             ..user
         });
     } else {
@@ -138,7 +151,6 @@ pub fn identity_connected(ctx: &ReducerContext) {
         ctx.db.user().insert(User {
             identity: ctx.sender,
             name,
-            email,
             online: true,
         });
     }
