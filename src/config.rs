@@ -1,3 +1,5 @@
+#[cfg(feature = "bevy")]
+use bevy::prelude::Resource;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,11 +45,13 @@ pub struct Wave {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "bevy", derive(Resource))]
 pub struct UnitsConfig {
     pub units: Vec<UnitType>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "bevy", derive(Resource))]
 pub struct WavesConfig {
     pub waves: Vec<Wave>,
 }

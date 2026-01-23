@@ -20,6 +20,7 @@ pub fn spawn_tower(
 
     commands.spawn((
         Sprite::from_image(asset_server.load(&tower_type.sprite_path)),
+        //TODO: We should replace "Blue" with Color!
         Transform::from_translation(position).with_scale(Vec3::splat(scale)),
         Tower {
             tower_type_id: tower_type.id.clone(),

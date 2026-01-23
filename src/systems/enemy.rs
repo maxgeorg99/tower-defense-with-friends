@@ -3,12 +3,19 @@ use bevy::prelude::*;
 use crate::components::{AnimationTimer, Enemy, HealthBar, HealthBarFill};
 use crate::constants::{SCALED_TILE_SIZE, WARRIOR_FRAME_SIZE};
 use crate::resources::{EnemySpawner, GameState, PathWaypoints, WaveConfigs};
+use crate::systems::WaveManager;
 
 #[derive(Component)]
 pub struct AnimationInfo {
     pub frame_count: usize,
 }
 
+
+// ============================================================================
+// Modified spawn_enemies integration
+// ============================================================================
+
+/// Modified version of your spawn_enemies system
 pub fn spawn_enemies(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -18,20 +25,23 @@ pub fn spawn_enemies(
     mut game_state: ResMut<GameState>,
     waypoints: Res<PathWaypoints>,
     wave_configs: Res<WaveConfigs>,
+    wave_manager: Res<WaveManager>,
 ) {
+    // Only spawn enemies during active wave
+    if !wave_manager.wave_active {
+        return;
+    }
+
     spawner.timer.tick(time.delta());
 
     if spawner.timer.just_finished() && spawner.enemies_spawned < spawner.enemies_this_wave {
-        // Get current wave config
         let current_wave_idx = (game_state.wave - 1) as usize;
         if current_wave_idx >= wave_configs.waves.len() {
-            // No more waves defined
             return;
         }
 
         let wave = &wave_configs.waves[current_wave_idx];
 
-        // Calculate which spawn we're on
         let mut cumulative_count = 0;
         let mut selected_spawn = None;
 
@@ -47,26 +57,20 @@ pub fn spawn_enemies(
         let total_count = wave.spawns.iter().map(|s| s.count).sum::<i32>();
 
         if let Some(spawn) = selected_spawn {
-            // Find the unit type
             if let Some(unit_type) = wave_configs.units.iter().find(|u| u.id == spawn.unit_id) {
-                // Spawn enemy at the start of the path
                 let start_pos = waypoints.points.first().copied().unwrap_or(Vec2::ZERO);
-
-                // Calculate health based on unit type and multiplier
                 let max_health = unit_type.base_health * spawn.health_multiplier;
 
-                // Create texture atlas layout using unit_type data
                 let [frame_width, frame_height] = unit_type.frame_size;
                 let layout = TextureAtlasLayout::from_grid(
                     UVec2::new(frame_width, frame_height),
                     unit_type.frame_count as u32,
-                    1, // Assuming horizontal sprite sheets
+                    1,
                     None,
                     None,
                 );
                 let texture_atlas_layout = texture_atlases.add(layout);
 
-                // Scale to fit 1 tile (using frame width as reference)
                 let enemy_scale = SCALED_TILE_SIZE / frame_width as f32;
 
                 let enemy_entity = commands
@@ -100,18 +104,14 @@ pub fn spawn_enemies(
 
                 spawner.enemies_spawned += 1;
 
-                // Check if wave is complete
                 if spawner.enemies_spawned >= total_count {
                     spawner.enemies_spawned = 0;
                     game_state.wave += 1;
 
-                    // Update spawn interval for next wave if available
                     if (game_state.wave - 1) < wave_configs.waves.len() as i32 {
                         let next_wave = &wave_configs.waves[(game_state.wave - 1) as usize];
                         spawner.timer =
                             Timer::from_seconds(next_wave.spawn_interval, TimerMode::Repeating);
-
-                        // Calculate total enemies for next wave
                         spawner.enemies_this_wave = next_wave.spawns.iter().map(|s| s.count).sum();
                     }
                 }

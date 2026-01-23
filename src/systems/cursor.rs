@@ -20,7 +20,7 @@ fn setup_custom_cursor(
         commands.entity(window_entity).insert(
             CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
                 handle: cursor_image.clone(),
-                hotspot: (0, 0),
+                hotspot: (0, 0), //TODO can we make it more on the finger tip?
                 ..default()
             }))
         );

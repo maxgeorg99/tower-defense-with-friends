@@ -1,11 +1,11 @@
 use bevy::ecs::prelude::ChildSpawnerCommands;
 use bevy::prelude::*;
 use bevy_spacetimedb::*;
-
+use spacetimedb_sdk::Table;
 use crate::auth::AuthState;
 use crate::module_bindings::set_color_reducer::set_color;
 use crate::module_bindings::set_name_reducer::set_name;
-use crate::module_bindings::{Color as PlayerColor, DbConnection};
+use crate::module_bindings::{Color as PlayerColor, DbConnection, MyUserTableAccess};
 use crate::resources::AppState;
 use crate::systems::menu::{ButtonStyle, spawn_nine_slice_button};
 
@@ -61,18 +61,27 @@ impl Plugin for ColorSelectPlugin {
 
 /// Setup the color select screen UI
 fn setup_color_select_screen(
+    stdb: Option<SpacetimeDB>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut username_state: ResMut<UsernameInputState>,
     auth_state: Res<AuthState>,
 ) {
-    // Initialize username from auth profile or use default
     if username_state.value.is_empty() {
         username_state.value = auth_state
             .user_profile
             .as_ref()
-            .and_then(|p| p.preferred_username.clone().or_else(|| Some(p.name.clone())))
-            .filter(|s| !s.is_empty())
+            .and_then(|p| {
+                p.preferred_username
+                    .clone()
+                    .or_else(|| Some(p.name.clone()))
+                    .filter(|s| !s.is_empty())
+            })
+            .or_else(|| {
+                stdb.as_ref()
+                    .and_then(|db| db.db().my_user().iter().next())
+                    .and_then(|user| user.name.clone())
+            })
             .unwrap_or_else(|| "Player".to_string());
     }
 

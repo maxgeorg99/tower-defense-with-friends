@@ -141,18 +141,10 @@ fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         .with_children(|parent| {
             // Title
             parent.spawn((
-                Text::new("TOWER DEFENSE MMO"),
+                Text::new("TD MMO"),
                 TextFont { font_size: 48.0, ..default() },
                 TextColor(Color::srgb(0.92, 0.96, 0.96)),
                 Node { margin: UiRect::bottom(Val::Px(5.0)), ..default() },
-            ));
-
-            // Subtitle
-            parent.spawn((
-                Text::new("Defend Together!"),
-                TextFont { font_size: 18.0, ..default() },
-                TextColor(Color::srgb(0.7, 0.78, 0.78)),
-                Node { margin: UiRect::bottom(Val::Px(25.0)), ..default() },
             ));
 
             // Buttons

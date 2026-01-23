@@ -22,7 +22,6 @@ use std::{
     fs,
     io::{self, stdout},
 };
-// === APP STATE ===
 
 enum SelectedPanel {
     Towers,

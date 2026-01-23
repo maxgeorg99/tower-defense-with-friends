@@ -6,6 +6,7 @@ use crate::resources::GameState;
 use crate::systems::AnimationInfo;
 
 pub fn update_ui(game_state: Res<GameState>, mut ui_query: Query<&mut Text, With<GameUI>>) {
+    //TODO Move to separate component and Use icons!
     for mut text in ui_query.iter_mut() {
         **text = format!(
             "Lives: {} | Gold: {} | Wave: {} | Score: {}",
