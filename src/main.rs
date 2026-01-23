@@ -21,9 +21,8 @@ use module_bindings::user_table::UserTableAccess;
 use module_bindings::{DbConnection, RemoteModule, RemoteTables};
 
 use auth::{
-    check_auth_and_connect, cleanup_login_screen, handle_anonymous_button,
-    handle_login_button, load_token_from_file, setup_login_screen, update_login_button_colors,
-    AuthConfig, AuthState,
+    check_auth_and_connect, load_token_from_file, start_login,
+    AuthConfig, AuthState, CallbackServerState,
 };
 use bevy::BevyPlugin;
 #[cfg(feature = "bevy-demo")]
@@ -65,6 +64,7 @@ fn main() {
     app.add_plugins(BevyPlugin)
         .add_plugins(EventPlugin)
         .add_plugins(MenuPlugin)
+        .add_plugins(ColorSelectPlugin)
         .add_plugins(CursorPlugin)
     ;
 
@@ -101,19 +101,9 @@ fn main() {
     })
     .insert_resource(FogOfWar::new())
     .add_systems(Startup, setup_camera)
-    .add_systems(OnEnter(AppState::Login), setup_login_screen)
-    .add_systems(
-        Update,
-        (
-            handle_login_button,
-            handle_anonymous_button,
-            update_login_button_colors,
-            check_auth_and_connect,
-        )
-            .run_if(in_state(AppState::Login)),
-    )
-    .add_systems(OnExit(AppState::Login), cleanup_login_screen)
-    .add_systems(OnEnter(AppState::InGame), (connect_to_spacetimedb, setup_game, setup_fog_of_war, setup_online_users_ui).chain())
+    .add_systems(Update, (handle_login_request, check_auth_and_connect))
+    .add_systems(OnEnter(AppState::ColorSelect), connect_to_spacetimedb)
+    .add_systems(OnEnter(AppState::InGame), (setup_game, setup_fog_of_war, setup_online_users_ui).chain())
     .add_systems(
         Update,
         (
@@ -162,4 +152,21 @@ fn main() {
     app.add_plugins(DebugPlugin);
 
     app.run();
+}
+
+/// Handle login button press from menu
+fn handle_login_request(
+    mut commands: Commands,
+    mut events: EventReader<LoginRequestEvent>,
+    config: Res<AuthConfig>,
+    mut auth_state: ResMut<AuthState>,
+) {
+    for _ in events.read() {
+        if !auth_state.pending {
+            info!("Login button pressed, starting OAuth PKCE flow...");
+            let callback_state = start_login(&config);
+            commands.insert_resource(CallbackServerState(callback_state));
+            auth_state.pending = true;
+        }
+    }
 }

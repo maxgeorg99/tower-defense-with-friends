@@ -32,11 +32,11 @@ impl Default for GameState {
 
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub enum AppState {
-    /// Show login screen (when auth is required)
-    #[default]
-    Login,
     /// Main Menu
+    #[default]
     MainMenu,
+    /// Color and username selection screen
+    ColorSelect,
     /// Main game
     InGame,
     /// Game over screen

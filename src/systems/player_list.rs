@@ -1,9 +1,10 @@
+use bevy::ecs::prelude::ChildSpawnerCommands;
 use bevy::prelude::*;
 use bevy_spacetimedb::*;
 use spacetimedb_sdk::Table;
 
 use crate::module_bindings::user_table::UserTableAccess;
-use crate::module_bindings::{DbConnection, User, Color as PlayerColor};
+use crate::module_bindings::{Color as PlayerColor, DbConnection, User};
 
 /// Type alias for cleaner SpacetimeDB resource access
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
@@ -19,19 +20,18 @@ pub struct PlayerBanner;
 /// Setup the online users UI panel
 pub fn setup_online_users_ui(mut commands: Commands) {
     // Create a panel in the center-right area for online users
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                top: Val::Percent(20.0),
-                right: Val::Px(20.0),
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(15.0),
-                width: Val::Px(320.0),
-                ..default()
-            },
-            OnlineUsersPanel,
-        ));
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Percent(20.0),
+            right: Val::Px(20.0),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(15.0),
+            width: Val::Px(320.0),
+            ..default()
+        },
+        OnlineUsersPanel,
+    ));
 }
 
 /// System to update the online users list UI
@@ -88,41 +88,46 @@ pub fn update_online_users_ui(
 }
 
 /// Spawns a single player banner with styled background and avatar
-fn spawn_player_banner(parent: &mut ChildSpawner, user: &User, asset_server: &AssetServer) {
+fn spawn_player_banner(
+    parent: &mut ChildSpawnerCommands,
+    user: &User,
+    asset_server: &AssetServer,
+) {
     let name = user.name.as_deref().unwrap_or("Anonymous");
 
     // Get player color paths from enum
     let (ribbon_path, avatar_path) = match user.color {
         PlayerColor::Blue => (
             "UI Elements/UI Elements/Ribbons/Ribbon_Blue.png",
-            "UI Elements/UI Elements/Human Avatars/Avatar_Blue.png"
+            "UI Elements/UI Elements/Human Avatars/Avatar_Blue.png",
         ),
         PlayerColor::Yellow => (
             "UI Elements/UI Elements/Ribbons/Ribbon_Yellow.png",
-            "UI Elements/UI Elements/Human Avatars/Avatar_Yellow.png"
+            "UI Elements/UI Elements/Human Avatars/Avatar_Yellow.png",
         ),
         PlayerColor::Purple => (
             "UI Elements/UI Elements/Ribbons/Ribbon_Purple.png",
-            "UI Elements/UI Elements/Human Avatars/Avatar_Purple.png"
+            "UI Elements/UI Elements/Human Avatars/Avatar_Purple.png",
         ),
         PlayerColor::Black => (
             "UI Elements/UI Elements/Ribbons/Ribbon_Black.png",
-            "UI Elements/UI Elements/Human Avatars/Avatar_Black.png"
+            "UI Elements/UI Elements/Human Avatars/Avatar_Black.png",
         ),
     };
 
     parent
-        .spawn_with_children((
-                                 Node {
-                                     width: Val::Percent(100.0),
-                                     height: Val::Px(80.0),
-                                     align_items: AlignItems::Center,
-                                     justify_content: JustifyContent::Start,
-                                     position_type: PositionType::Relative,
-                                     ..default()
-                                 },
-                                 PlayerBanner,
-                             ), |banner| {
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(80.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Start,
+                position_type: PositionType::Relative,
+                ..default()
+            },
+            PlayerBanner,
+        ))
+        .with_children(|banner| {
             // Ribbon background image
             banner.spawn((
                 ImageNode::new(asset_server.load(ribbon_path)),
@@ -136,22 +141,23 @@ fn spawn_player_banner(parent: &mut ChildSpawner, user: &User, asset_server: &As
 
             // Avatar container (left side) - positioned on top of ribbon
             banner
-                .spawn_with_children((
-                                         Node {
-                                             width: Val::Px(56.0),
-                                             height: Val::Px(56.0),
-                                             margin: UiRect {
-                                                 left: Val::Px(12.0),
-                                                 right: Val::Px(15.0),
-                                                 ..default()
-                                             },
-                                             justify_content: JustifyContent::Center,
-                                             align_items: AlignItems::Center,
-                                             ..default()
-                                         },
-                                         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.4)),
-                                         BorderRadius::all(Val::Px(8.0)),
-                                     ), |avatar_container| {
+                .spawn((
+                    Node {
+                        width: Val::Px(56.0),
+                        height: Val::Px(56.0),
+                        margin: UiRect {
+                            left: Val::Px(12.0),
+                            right: Val::Px(15.0),
+                            ..default()
+                        },
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.4)),
+                    BorderRadius::all(Val::Px(8.0)),
+                ))
+                .with_children(|avatar_container| {
                     // Avatar image
                     avatar_container.spawn((
                         ImageNode::new(asset_server.load(avatar_path)),
@@ -163,6 +169,7 @@ fn spawn_player_banner(parent: &mut ChildSpawner, user: &User, asset_server: &As
                     ));
                 });
 
+            // Player name
             banner.spawn((
                 Text::new(name.to_uppercase()),
                 TextFont {

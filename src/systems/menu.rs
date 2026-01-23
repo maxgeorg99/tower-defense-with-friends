@@ -98,11 +98,15 @@ struct SettingsButton;
 #[derive(Component)]
 struct QuitButton;
 
+#[derive(Component)]
+pub struct LoginButton;
+
 pub struct MenuPlugin;
 
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
         app
+            .add_event::<LoginRequestEvent>()
             .add_systems(OnEnter(AppState::MainMenu), setup_menu)
             .add_systems(
                 Update,
@@ -110,6 +114,7 @@ impl Plugin for MenuPlugin {
                     button_interaction::<PlayButton>,
                     button_interaction::<SettingsButton>,
                     button_interaction::<QuitButton>,
+                    button_interaction::<LoginButton>,
                     update_nine_slice_textures,
                 ).run_if(in_state(AppState::MainMenu)),
             )
@@ -118,6 +123,7 @@ impl Plugin for MenuPlugin {
 }
 
 fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
+    // Main menu container
     commands
         .spawn((
             Node {
@@ -154,9 +160,25 @@ fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
             spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallBlueRound, "SETTINGS", SettingsButton);
             spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallRedRound, "QUIT", QuitButton);
         });
+
+    // Login button in top-right corner
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(20.0),
+                right: Val::Px(20.0),
+                ..default()
+            },
+            GlobalZIndex(10),
+            MenuUI,
+        ))
+        .with_children(|parent| {
+            spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallBlueRound, "LOGIN", LoginButton);
+        });
 }
 
-fn spawn_nine_slice_button<M: Component>(
+pub fn spawn_nine_slice_button<M: Component>(
     parent: &mut ChildSpawnerCommands,
     asset_server: &AssetServer,
     style: ButtonStyle,
@@ -253,19 +275,26 @@ fn button_interaction<M: Component>(
     query: Query<&Interaction, (Changed<Interaction>, With<M>)>,
     mut next_state: ResMut<NextState<AppState>>,
     mut exit: EventWriter<AppExit>,
+    mut login_event: EventWriter<LoginRequestEvent>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             if std::any::type_name::<M>().contains("PlayButton") {
-                next_state.set(AppState::InGame);
+                next_state.set(AppState::ColorSelect);
             } else if std::any::type_name::<M>().contains("QuitButton") {
                 exit.write(AppExit::Success);
             } else if std::any::type_name::<M>().contains("SettingsButton") {
                 info!("Settings pressed");
+            } else if std::any::type_name::<M>().contains("LoginButton") {
+                login_event.write(LoginRequestEvent);
             }
         }
     }
 }
+
+/// Event to trigger login from menu
+#[derive(Message)]
+pub struct LoginRequestEvent;
 
 fn update_nine_slice_textures(
     asset_server: Res<AssetServer>,

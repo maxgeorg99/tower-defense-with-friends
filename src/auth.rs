@@ -371,7 +371,6 @@ fn get_success_html() -> String {
 
                 // If still open after 500ms, show fallback message
                 setTimeout(() => {
-                    countdownEl.textContent = '👆';
                     document.querySelector('h1').textContent =
                         'Please close this tab manually';
                 }, 500);
@@ -618,13 +617,12 @@ pub fn update_login_button_colors(
     }
 }
 
-/// Check if auth completed and exchange code for tokens, then connect to SpacetimeDB
+/// Check if auth completed and exchange code for tokens
 pub fn check_auth_and_connect(
     callback_state: Option<Res<CallbackServerState>>,
     mut auth_state: ResMut<AuthState>,
     config: Res<AuthConfig>,
     mut stdb_config: ResMut<crate::resources::StdbConfig>,
-    mut next_state: ResMut<NextState<AppState>>,
 ) {
     let Some(callback) = callback_state else {
         return;
@@ -678,10 +676,7 @@ pub fn check_auth_and_connect(
                     }
 
                     auth_state.pending = false;
-
-                    // Transition to InGame state - connection will be established there
-                    info!("Authentication successful! Connecting to game...");
-                    next_state.set(AppState::InGame);
+                    info!("Authentication successful! You can now play.");
                 }
                 Err(e) => {
                     error!("Token exchange failed: {}", e);
