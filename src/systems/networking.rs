@@ -1,20 +1,10 @@
 use bevy::prelude::*;
 use bevy_spacetimedb::*;
-use spacetimedb_sdk::Table;
 
-use crate::module_bindings::user_table::UserTableAccess;
 use crate::module_bindings::{DbConnection, User};
 
 /// Type alias for cleaner SpacetimeDB resource access
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
-
-/// Marker component for the online users UI panel
-#[derive(Component)]
-pub struct OnlineUsersPanel;
-
-/// Marker component for individual user list items
-#[derive(Component)]
-pub struct UserListItem;
 
 /// System to handle SpacetimeDB connection events
 pub fn on_connected(messages: Option<ReadStdbConnectedMessage>, stdb: Option<SpacetimeDB>) {
@@ -90,90 +80,4 @@ pub fn on_user_deleted(messages: Option<ReadDeleteMessage<User>>) {
         let name = msg.row.name.as_deref().unwrap_or("Anonymous");
         info!("User removed: {}", name);
     }
-}
-
-/// Setup the online users UI panel
-pub fn setup_online_users_ui(mut commands: Commands) {
-    // Create a panel in the top-right corner for online users
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                top: Val::Px(10.0),
-                right: Val::Px(10.0),
-                flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(10.0)),
-                row_gap: Val::Px(5.0),
-                min_width: Val::Px(150.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
-            OnlineUsersPanel,
-        ))
-        .with_children(|parent| {
-            // Header
-            parent.spawn((
-                Text::new("Online Users"),
-                TextFont {
-                    font_size: 16.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-        });
-}
-
-/// System to update the online users list UI
-pub fn update_online_users_ui(
-    stdb: Option<SpacetimeDB>,
-    mut commands: Commands,
-    panel_query: Query<Entity, With<OnlineUsersPanel>>,
-    user_items_query: Query<Entity, With<UserListItem>>,
-) {
-    let Some(stdb) = stdb else {
-        return;
-    };
-
-    // Only update if we have a panel
-    let Ok(panel_entity) = panel_query.single() else {
-        return;
-    };
-
-    // Remove existing user list items
-    for entity in user_items_query.iter() {
-        commands.entity(entity).despawn();
-    }
-
-    // Get all online users from the database cache
-    let users: Vec<User> = stdb.db().user().iter().filter(|u| u.online).collect();
-
-    // Add user items to the panel
-    commands.entity(panel_entity).with_children(|parent| {
-        if users.is_empty() {
-            parent.spawn((
-                Text::new("No users online"),
-                TextFont {
-                    font_size: 12.0,
-                    ..default()
-                },
-                TextColor(Color::srgba(0.7, 0.7, 0.7, 1.0)),
-                UserListItem,
-            ));
-        } else {
-            for user in users {
-                let name = user.name.as_deref().unwrap_or("Anonymous");
-                let display_text = format!("• {}", name);
-
-                parent.spawn((
-                    Text::new(display_text),
-                    TextFont {
-                        font_size: 12.0,
-                        ..default()
-                    },
-                    TextColor(Color::srgba(0.0, 1.0, 0.0, 1.0)),
-                    UserListItem,
-                ));
-            }
-        }
-    });
 }

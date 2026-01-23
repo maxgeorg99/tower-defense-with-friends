@@ -9,6 +9,8 @@ pub mod tower;
 pub mod ui;
 pub mod menu;
 pub mod cursor;
+pub mod player_list;
+mod color_select;
 
 pub use camera::*;
 pub use enemy::*;
@@ -21,3 +23,4 @@ pub use tower::*;
 pub use ui::*;
 pub use menu::*;
 pub use cursor::*;
+pub use player_list::*;

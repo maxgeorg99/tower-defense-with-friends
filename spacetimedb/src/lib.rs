@@ -7,18 +7,11 @@ pub struct User {
     #[primary_key]
     identity: Identity,
     name: Option<String>,
+    color: Color,
     online: bool,
 }
 
-#[spacetimedb::table(name = player, public)]
-pub struct Player {
-    #[primary_key]
-    identity: Identity,
-    name: String,
-    color: Color,
-}
-
-#[derive(SpacetimeType)]
+#[derive(SpacetimeType, Debug, Clone)]
 pub enum Color {
     Blue,
     Yellow,
@@ -57,6 +50,21 @@ pub fn set_name(ctx: &ReducerContext, name: String) -> Result<(), String> {
         Ok(())
     } else {
         Err("Cannot set name for unknown user".to_string())
+    }
+}
+
+
+#[spacetimedb::reducer]
+pub fn set_color(ctx: &ReducerContext, color: Color) -> Result<(), String> {
+    if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
+        log::info!("User {} sets color to {:?}", ctx.sender, color);
+        ctx.db.user().identity().update(User {
+            color,
+            ..user
+        });
+        Ok(())
+    } else {
+        Err("Cannot set color for unknown user".to_string())
     }
 }
 
@@ -115,27 +123,19 @@ fn extract_user_profile(jwt: &JwtClaims) -> Option<UserProfile> {
 pub fn identity_connected(ctx: &ReducerContext) {
     let auth_ctx = ctx.sender_auth();
 
-    let (name, email) = if let Some(jwt) = auth_ctx.jwt() {
-        // Extract full profile from JWT
+    let name = if let Some(jwt) = auth_ctx.jwt() {
         if let Some(profile) = extract_user_profile(jwt) {
-            info!(
-                "User connected - name: {:?}, email: {:?}",
-                profile.name,
-                profile.email
-            );
-
-            // Use the full name, or fallback to given_name
             let display_name = profile.name
                 .or_else(|| profile.given_name.clone());
 
-            (display_name, profile.email)
+            display_name
         } else {
             log::warn!("Failed to parse JWT payload for user: {}", ctx.sender);
-            (None, None)
+            None
         }
     } else {
         log::info!("User connected anonymously: {}", ctx.sender);
-        (None, None)
+        None
     };
 
     if let Some(user) = ctx.db.user().identity().find(ctx.sender) {
@@ -144,6 +144,7 @@ pub fn identity_connected(ctx: &ReducerContext) {
             online: true,
             // Keep existing data if already set, otherwise use JWT data
             name: user.name.or(name),
+            color: user.color,
             ..user
         });
     } else {
@@ -151,6 +152,7 @@ pub fn identity_connected(ctx: &ReducerContext) {
         ctx.db.user().insert(User {
             identity: ctx.sender,
             name,
+            color: Color::Purple,
             online: true,
         });
     }
