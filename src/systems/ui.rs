@@ -5,16 +5,6 @@ use crate::constants::SCALED_TILE_SIZE;
 use crate::resources::GameState;
 use crate::systems::AnimationInfo;
 
-pub fn update_ui(game_state: Res<GameState>, mut ui_query: Query<&mut Text, With<GameUI>>) {
-    //TODO Move to separate component and Use icons!
-    for mut text in ui_query.iter_mut() {
-        **text = format!(
-            "Lives: {} | Gold: {} | Wave: {} | Score: {}",
-            game_state.lives, game_state.gold, game_state.wave, game_state.score
-        );
-    }
-}
-
 pub fn update_health_bars(
     enemies: Query<(&Enemy, &Children)>,
     health_bars: Query<(&HealthBar, &Children)>,

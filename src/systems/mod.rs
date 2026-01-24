@@ -12,6 +12,7 @@ pub mod setup;
 pub mod tower;
 pub mod ui;
 pub mod wave_manager_ui;
+pub mod top_bar;
 
 pub use camera::*;
 pub use color_select::*;
@@ -27,3 +28,4 @@ pub use setup::*;
 pub use tower::*;
 pub use ui::*;
 pub use wave_manager_ui::*;
+pub use top_bar::*;

@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use crate::resources::AppState;
+use bevy::prelude::*;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ButtonStyle {
@@ -17,10 +17,18 @@ impl ButtonStyle {
         match self {
             Self::BigBlue => "UI Elements/UI Elements/Buttons/BigBlueButton_Regular.png",
             Self::BigRed => "UI Elements/UI Elements/Buttons/BigRedButton_Regular.png",
-            Self::SmallBlueRound => "UI Elements/UI Elements/Buttons/SmallBlueRoundButton_Regular.png",
-            Self::SmallRedRound => "UI Elements/UI Elements/Buttons/SmallRedRoundButton_Regular.png",
-            Self::SmallBlueSquare => "UI Elements/UI Elements/Buttons/SmallBlueSquareButton_Regular.png",
-            Self::SmallRedSquare => "UI Elements/UI Elements/Buttons/SmallRedSquareButton_Regular.png",
+            Self::SmallBlueRound => {
+                "UI Elements/UI Elements/Buttons/SmallBlueRoundButton_Regular.png"
+            }
+            Self::SmallRedRound => {
+                "UI Elements/UI Elements/Buttons/SmallRedRoundButton_Regular.png"
+            }
+            Self::SmallBlueSquare => {
+                "UI Elements/UI Elements/Buttons/SmallBlueSquareButton_Regular.png"
+            }
+            Self::SmallRedSquare => {
+                "UI Elements/UI Elements/Buttons/SmallRedSquareButton_Regular.png"
+            }
         }
     }
 
@@ -28,10 +36,18 @@ impl ButtonStyle {
         match self {
             Self::BigBlue => "UI Elements/UI Elements/Buttons/BigBlueButton_Pressed.png",
             Self::BigRed => "UI Elements/UI Elements/Buttons/BigRedButton_Pressed.png",
-            Self::SmallBlueRound => "UI Elements/UI Elements/Buttons/SmallBlueRoundButton_Pressed.png",
-            Self::SmallRedRound => "UI Elements/UI Elements/Buttons/SmallRedRoundButton_Pressed.png",
-            Self::SmallBlueSquare => "UI Elements/UI Elements/Buttons/SmallBlueSquareButton_Pressed.png",
-            Self::SmallRedSquare => "UI Elements/UI Elements/Buttons/SmallRedSquareButton_Pressed.png",
+            Self::SmallBlueRound => {
+                "UI Elements/UI Elements/Buttons/SmallBlueRoundButton_Pressed.png"
+            }
+            Self::SmallRedRound => {
+                "UI Elements/UI Elements/Buttons/SmallRedRoundButton_Pressed.png"
+            }
+            Self::SmallBlueSquare => {
+                "UI Elements/UI Elements/Buttons/SmallBlueSquareButton_Pressed.png"
+            }
+            Self::SmallRedSquare => {
+                "UI Elements/UI Elements/Buttons/SmallRedSquareButton_Pressed.png"
+            }
         }
     }
 
@@ -105,8 +121,7 @@ pub struct MenuPlugin;
 
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_event::<LoginRequestEvent>()
+        app.add_event::<LoginRequestEvent>()
             .add_systems(OnEnter(AppState::MainMenu), setup_menu)
             .add_systems(
                 Update,
@@ -116,14 +131,29 @@ impl Plugin for MenuPlugin {
                     button_interaction::<QuitButton>,
                     button_interaction::<LoginButton>,
                     update_nine_slice_textures,
-                ).run_if(in_state(AppState::MainMenu)),
+                )
+                    .run_if(in_state(AppState::MainMenu)),
             )
             .add_systems(OnExit(AppState::MainMenu), cleanup_menu);
     }
 }
 
 fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // Main menu container
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        },
+        ImageNode::new(asset_server.load("MenuBackground.png")),
+        ZIndex(-1000),
+        MenuUI
+    ));
+
+    // Main menu container (on top of GIF)
     commands
         .spawn((
             Node {
@@ -135,22 +165,32 @@ fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                 row_gap: Val::Px(18.0),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.15, 0.28, 0.32)),
+            BackgroundColor(Color::NONE),
             MenuUI,
         ))
-        .with_children(|parent| {
-            // Title
-            parent.spawn((
-                Text::new("TD MMO"),
-                TextFont { font_size: 48.0, ..default() },
-                TextColor(Color::srgb(0.92, 0.96, 0.96)),
-                Node { margin: UiRect::bottom(Val::Px(5.0)), ..default() },
-            ));
-
+        .with_children(|parent| {  // <- Added this line!
             // Buttons
-            spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallBlueRound, "PLAY", PlayButton);
-            spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallBlueRound, "SETTINGS", SettingsButton);
-            spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallRedRound, "QUIT", QuitButton);
+            spawn_nine_slice_button(
+                parent,
+                &asset_server,
+                ButtonStyle::SmallBlueRound,
+                "PLAY",
+                PlayButton,
+            );
+            spawn_nine_slice_button(
+                parent,
+                &asset_server,
+                ButtonStyle::SmallBlueRound,
+                "SETTINGS",
+                SettingsButton,
+            );
+            spawn_nine_slice_button(
+                parent,
+                &asset_server,
+                ButtonStyle::SmallRedRound,
+                "QUIT",
+                QuitButton,
+            );
         });
 
     // Login button in top-right corner
@@ -158,15 +198,21 @@ fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: Val::Px(20.0),
-                right: Val::Px(20.0),
+                top: Val::Px(50.0),
+                right: Val::Px(50.0),
                 ..default()
             },
             GlobalZIndex(10),
             MenuUI,
         ))
         .with_children(|parent| {
-            spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallBlueRound, "LOGIN", LoginButton);
+            spawn_nine_slice_button(
+                parent,
+                &asset_server,
+                ButtonStyle::SmallBlueRound,
+                "LOGIN",
+                LoginButton,
+            );
         });
 }
 
@@ -227,10 +273,14 @@ pub fn spawn_nine_slice_button<M: Component>(
                     ..default()
                 },
                 NineSlicePart,
-            )).with_children(|center| {
+            ))
+            .with_children(|center| {
                 center.spawn((
                     Text::new(label.to_string()),
-                    TextFont { font_size, ..default() },
+                    TextFont {
+                        font_size,
+                        ..default()
+                    },
                     TextColor(Color::WHITE),
                 ));
             });
@@ -243,11 +293,7 @@ pub fn spawn_nine_slice_button<M: Component>(
         });
 }
 
-fn spawn_grid_tile(
-    parent: &mut ChildSpawnerCommands,
-    texture: Handle<Image>,
-    rect: Rect,
-) {
+fn spawn_grid_tile(parent: &mut ChildSpawnerCommands, texture: Handle<Image>, rect: Rect) {
     parent.spawn((
         ImageNode {
             image: texture,

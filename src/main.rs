@@ -105,7 +105,7 @@ fn main() {
         .add_systems(OnEnter(AppState::ColorSelect), connect_to_spacetimedb)
         .add_systems(
             OnEnter(AppState::InGame),
-            (setup_game, setup_fog_of_war, setup_online_users_ui).chain(),
+            (setup_game, setup_fog_of_war, setup_online_users_ui, setup_top_bar).chain(),
         )
         .add_systems(
             Update,
@@ -132,6 +132,7 @@ fn main() {
                 move_projectiles,
                 handle_projectile_hits,
                 update_health_bars,
+                update_top_bar
             )
                 .run_if(in_state(AppState::InGame)),
         )
@@ -139,7 +140,6 @@ fn main() {
             Update,
             (
                 cleanup_dead_enemies,
-                update_ui,
                 check_game_over,
                 update_fog_visibility,
             )

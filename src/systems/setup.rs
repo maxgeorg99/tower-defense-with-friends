@@ -36,23 +36,6 @@ pub fn setup_game(mut commands: Commands, asset_server: Res<AssetServer>) {
         Transform::from_xyz(-480.0, -320.0, 0.0).with_scale(Vec3::splat(MAP_SCALE)),
     ));
 
-    // Spawn UI
-    commands.spawn((
-        Text::new("Lives: 20 | Gold: 100 | Wave: 1 | Left-click to open tower menu"),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(10.0),
-            left: Val::Px(10.0),
-            ..default()
-        },
-        TextFont {
-            font_size: 20.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        GameUI,
-    ));
-
     // Spawn castle at the end of the path (right side)
     let castle_scale = (SCALED_TILE_SIZE * 4.0) / CASTLE_SIZE.x.max(CASTLE_SIZE.y); // 4 tiles tall
     commands.spawn((

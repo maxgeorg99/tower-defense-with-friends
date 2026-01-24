@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use crate::components::{AnimationTimer, Enemy};
 use crate::config::{UnitSpawn, UnitType, UnitsConfig, Wave, WavesConfig};
 use crate::resources::{AppState, EnemySpawner, GameState, PathWaypoints, WaveConfigs};
+use crate::resources::AppState::InGame;
 use crate::systems::AnimationInfo;
 // ============================================================================
 // Components
@@ -45,7 +46,7 @@ pub fn setup_wave_panel(mut commands: Commands) {
     commands.spawn((
         Node {
             position_type: PositionType::Absolute,
-            top: Val::Px(20.0),
+            top: Val::Px(40.0),
             left: Val::Px(20.0),
             flex_direction: FlexDirection::Column,
             width: Val::Px(280.0),
@@ -61,6 +62,7 @@ pub fn update_wave_panel(
     asset_server: Res<AssetServer>,
     wave_manager: Res<WaveManager>,
     game_state: Option<Res<GameState>>,
+    app_state: Res<State<AppState>>,
     spawner: Option<Res<EnemySpawner>>,
     wave_configs: Option<Res<WaveConfigs>>,
     panel_query: Query<Entity, With<WavePanel>>,
@@ -81,6 +83,9 @@ pub fn update_wave_panel(
         return;
     };
 
+    if !app_state.eq(&InGame) {
+        return;
+    }
     // Only show panel during preparation phase or when no enemies spawned yet
     if wave_manager.wave_active && spawner.enemies_spawned > 0 {
         return;
@@ -177,17 +182,6 @@ fn spawn_wave_banner(
                             spawn_enemy_row(content, unit, spawn, asset_server);
                         }
                     }
-
-                    // // Timer centered and bigger
-                    // content.spawn((
-                    //     Text::new(format!("{}s", wave_manager.current_prep_time as i32)),
-                    //     TextFont {
-                    //         font_size: 24.0,
-                    //         ..default()
-                    //     },
-                    //     TextColor(Color::srgb(0.4, 0.25, 0.1)),
-                    //     WaveTimerText,
-                    // ));
                 });
         });
 }
