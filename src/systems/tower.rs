@@ -1,16 +1,33 @@
 use bevy::prelude::*;
-
+use bevy_spacetimedb::StdbConnection;
+use spacetimedb_sdk::Table;
 use crate::components::{Enemy, Tower, TowerWheelMenu, TowerWheelOption, Projectile};
 use crate::config::TowerType;
 use crate::constants::{ARROW_SIZE, EXPLORE_COST, EXPLORE_RADIUS, SCALED_TILE_SIZE, TOWER_SIZE};
 use crate::map::world_to_tile;
+use crate::module_bindings;
+use crate::module_bindings::{DbConnection, MyUserTableAccess, UserTableAccess};
 use crate::resources::{FogOfWar, GameState, TowerConfigs, TowerWheelState};
+
+//TODO Display for generated Types?!
+impl module_bindings::Color {
+    fn as_str(&self) -> &str {
+        match self {
+            module_bindings::Color::Blue => "Blue",
+            module_bindings::Color::Yellow => "Yellow",
+            module_bindings::Color::Purple => "Purple",
+            module_bindings::Color::Black => "Black",
+        }
+    }
+}
+pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
 
 pub fn spawn_tower(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
     position: Vec3,
     tower_type: &TowerType,
+    stdb: Option<SpacetimeDB>,
 ) {
     // Tower is 128x256, we want it to fit exactly 1 tile (32x32 when scaled)
     // Scale factor = desired_size / actual_size
@@ -18,9 +35,9 @@ pub fn spawn_tower(
     let scale_y = SCALED_TILE_SIZE / TOWER_SIZE.y; // 32 / 256 = 0.125
     let scale = scale_x.min(scale_y); // Use smaller to fit within 1 tile
 
+    let path = get_tower_sprite_path(tower_type, stdb.as_ref());
     commands.spawn((
-        Sprite::from_image(asset_server.load(&tower_type.sprite_path)),
-        //TODO: We should replace "Blue" with Color!
+        Sprite::from_image(asset_server.load(path)),
         Transform::from_translation(position).with_scale(Vec3::splat(scale)),
         Tower {
             tower_type_id: tower_type.id.clone(),
@@ -44,6 +61,7 @@ pub fn show_tower_wheel_menu(
     tower_configs: Res<TowerConfigs>,
     fog: Res<FogOfWar>,
     existing_menus: Query<Entity, With<TowerWheelMenu>>,
+    stdb: Option<SpacetimeDB>,
 ) {
     if mouse_button.just_pressed(MouseButton::Left) && !wheel_state.active {
         let Ok(window) = windows.single() else { return };
@@ -148,7 +166,7 @@ pub fn show_tower_wheel_menu(
                         let scale = 40.0 / TOWER_SIZE.x.max(TOWER_SIZE.y);
                         let sprite_entity = commands
                             .spawn((
-                                Sprite::from_image(asset_server.load(&tower_type.sprite_path)),
+                                Sprite::from_image(asset_server.load(get_tower_sprite_path(tower_type, stdb.as_ref()))),
                                 Transform::from_xyz(0.0, 0.0, 0.1).with_scale(Vec3::splat(scale)),
                             ))
                             .id();
@@ -236,6 +254,7 @@ pub fn handle_tower_selection(
     mut fog: ResMut<FogOfWar>,
     menu_options: Query<(&Transform, &TowerWheelOption), With<TowerWheelMenu>>,
     menu_entities: Query<Entity, With<TowerWheelMenu>>,
+    stdb: Option<SpacetimeDB>,
 ) {
     if mouse_button.just_released(MouseButton::Left) && wheel_state.active {
         let Ok(window) = windows.single() else { return };
@@ -288,7 +307,7 @@ pub fn handle_tower_selection(
                         let is_explored = fog.is_explored(tile_x, tile_y);
 
                         if game_state.gold >= tower_type.cost && is_explored {
-                            spawn_tower(&mut commands, &asset_server, snapped_pos, tower_type);
+                            spawn_tower(&mut commands, &asset_server, snapped_pos, tower_type, stdb);
                             game_state.gold -= tower_type.cost;
                         }
                     }
@@ -358,4 +377,15 @@ pub fn tower_shooting(
             }
         }
     }
+}
+
+fn get_user_color(stdb: Option<&SpacetimeDB>) -> module_bindings::Color {
+    stdb
+        .and_then(|stdb| stdb.db().user().iter().next().map(|user| user.color))
+        .unwrap_or(module_bindings::Color::Blue)
+}
+
+fn get_tower_sprite_path(tower_type: &TowerType, stdb: Option<&SpacetimeDB>) -> String {
+    let color = get_user_color(stdb);
+    tower_type.sprite_path.replace("Blue", color.as_str())
 }

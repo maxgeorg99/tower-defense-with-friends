@@ -166,7 +166,7 @@ fn setup_color_select_screen(
                         .spawn((
                             Node {
                                 width: Val::Px(380.0),
-                                flex_direction: FlexDirection::Row,
+                                flex_direction: FlexDirection::Column,
                                 justify_content: JustifyContent::SpaceEvenly,
                                 align_items: AlignItems::Center,
                                 padding: UiRect::axes(Val::Px(10.0), Val::Px(20.0)),
@@ -176,11 +176,11 @@ fn setup_color_select_screen(
                             BorderRadius::all(Val::Px(16.0)),
                             ColorSelectorPanel,
                         ))
-                        .with_children(|row| {
-                            spawn_color_button(row, &asset_server, PlayerColor::Blue);
-                            spawn_color_button(row, &asset_server, PlayerColor::Yellow);
-                            spawn_color_button(row, &asset_server, PlayerColor::Purple);
-                            spawn_color_button(row, &asset_server, PlayerColor::Black);
+                        .with_children(|col| {
+                            spawn_color_button(col, &asset_server, PlayerColor::Blue);
+                            spawn_color_button(col, &asset_server, PlayerColor::Yellow);
+                            spawn_color_button(col, &asset_server, PlayerColor::Purple);
+                            spawn_color_button(col, &asset_server, PlayerColor::Black);
                         });
                 });
 
@@ -189,7 +189,6 @@ fn setup_color_select_screen(
         });
 }
 
-/// Spawns a single color selection button with sword icon
 fn spawn_color_button(
     parent: &mut ChildSpawnerCommands,
     asset_server: &AssetServer,
@@ -206,13 +205,14 @@ fn spawn_color_button(
         .spawn((
             Button,
             Node {
-                width: Val::Px(75.0),
-                height: Val::Px(75.0),
+                width: Val::Px(145.0),
+                height: Val::Px(125.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.2, 0.2, 0.2, 0.8)),
+            BackgroundColor(Color::NONE),
+            BorderColor::default(),
             BorderRadius::all(Val::Px(12.0)),
             ColorButton(color),
         ))
@@ -220,8 +220,8 @@ fn spawn_color_button(
             button.spawn((
                 ImageNode::new(asset_server.load(sword_path)),
                 Node {
-                    width: Val::Px(55.0),
-                    height: Val::Px(55.0),
+                    width: Val::Px(140.0),
+                    height: Val::Px(80.0),
                     ..default()
                 },
             ));
