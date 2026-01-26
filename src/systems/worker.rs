@@ -10,6 +10,7 @@ use crate::constants::SCALED_TILE_SIZE;
 use crate::map::tile_to_world;
 use crate::module_bindings::{Color as PlayerColor, DbConnection, UserTableAccess};
 use crate::resources::GameState;
+use crate::systems::AnimationInfo;
 
 /// Type alias for cleaner SpacetimeDB resource access
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
@@ -76,7 +77,7 @@ pub fn setup_resource_gathering(
     let tree_scale_x = SCALED_TILE_SIZE / TREE_SIZE.x;
     let tree_scale_y = SCALED_TILE_SIZE / TREE_SIZE.y;
     let tree_scale = tree_scale_x.min(tree_scale_y);
-    let tree_positions = [(21, 13), (22, 15), (22, 14), (21, 16)];
+    let tree_positions = [(22, 15), (22, 14), (21, 16)];
     for (i, (tx, ty)) in tree_positions.iter().enumerate() {
         let tree_pos = tile_to_world(*tx, *ty);
         let tree_sprite = format!("Terrain/Resources/Wood/Trees/Tree{}.png", (i % 4) + 1);
@@ -87,16 +88,10 @@ pub fn setup_resource_gathering(
                 .with_scale(Vec3::splat(tree_scale)),
             ResourceNode {
                 resource_type: ResourceType::Wood,
-                remaining: 3,
+                remaining: 5,
             },
         ));
     }
-
-    info!(
-        "Resource gathering setup: building at ({}, {}), 4 trees spawned",
-        building_entity.index(),
-        building_pos
-    );
 }
 
 /// Spawn workers from building
@@ -143,11 +138,13 @@ pub fn spawn_workers(
                 AnimationTimer {
                     timer: Timer::from_seconds(0.15, TimerMode::Repeating),
                 },
+                AnimationInfo {
+                    frame_count: 6,
+                },
             ));
 
             building.spawned_workers += 1;
             info!(
-                "Worker spawned ({}/{})",
                 building.spawned_workers, building.max_workers
             );
         }
@@ -241,7 +238,6 @@ pub fn worker_arrive_check(
                     // Deposit resource and go idle
                     if buildings.get(worker.home_building).is_ok() {
                         game_state.wood += 1;
-                        info!("Wood deposited! Total: {}", game_state.wood);
                         commands.entity(worker_entity).remove::<WorkerTarget>();
                         *state = WorkerState::Idle;
                     }
@@ -305,7 +301,6 @@ pub fn worker_harvest(
     }
 }
 
-/// Update worker sprites based on state
 pub fn worker_sprite_update(
     asset_server: Res<AssetServer>,
     mut workers: Query<(&WorkerState, &mut Sprite), Changed<WorkerState>>,
@@ -326,5 +321,26 @@ pub fn worker_sprite_update(
 
         // Update the sprite image
         sprite.image = asset_server.load(&texture_path);
+
+        // Reset to first frame when state changes
+        if let Some(atlas) = &mut sprite.texture_atlas {
+            atlas.index = 0;
+        }
+    }
+}
+
+// Separate system to animate frames
+pub fn animate_worker_sprites(
+    time: Res<Time>,
+    mut workers: Query<(&mut Sprite, &mut AnimationTimer, &AnimationInfo)>,
+) {
+    for (mut sprite, mut timer, info) in workers.iter_mut() {
+        timer.timer.tick(time.delta());
+
+        if timer.timer.just_finished() {
+            if let Some(atlas) = &mut sprite.texture_atlas {
+                atlas.index = (atlas.index + 1) % info.frame_count;
+            }
+        }
     }
 }

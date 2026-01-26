@@ -162,6 +162,7 @@ fn main() {
                 worker_arrive_check,
                 worker_harvest,
                 worker_sprite_update,
+                animate_worker_sprites
             )
                 .run_if(in_state(AppState::InGame)),
         )
