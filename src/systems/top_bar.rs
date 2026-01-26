@@ -12,6 +12,9 @@ pub struct LivesText;
 #[derive(Component)]
 pub struct GoldText;
 
+#[derive(Component)]
+pub struct WoodText;
+
 // Setup top bar
 pub fn setup_top_bar(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
@@ -34,6 +37,12 @@ pub fn setup_top_bar(mut commands: Commands, asset_server: Res<AssetServer>) {
                 &asset_server,
                 "UI Elements/UI Elements/Icons/Gold_Icon.png",
                 GoldText,
+            );
+            spawn_stat_display(
+                parent,
+                &asset_server,
+                "Terrain/Resources/Wood/Wood Resource/Wood Resource.png",
+                WoodText,
             );
             spawn_stat_display(
                 parent,
@@ -82,13 +91,17 @@ fn spawn_stat_display(
 // Update function
 pub fn update_top_bar(
     game_state: Res<GameState>,
-    mut lives_query: Query<&mut Text, (With<LivesText>, Without<GoldText>)>,
-    mut gold_query: Query<&mut Text, (With<GoldText>, Without<LivesText>)>,
+    mut lives_query: Query<&mut Text, (With<LivesText>, Without<GoldText>, Without<WoodText>)>,
+    mut gold_query: Query<&mut Text, (With<GoldText>, Without<LivesText>, Without<WoodText>)>,
+    mut wood_query: Query<&mut Text, (With<WoodText>, Without<LivesText>, Without<GoldText>)>,
 ) {
     for mut text in lives_query.iter_mut() {
         text.0 = game_state.lives.to_string();
     }
     for mut text in gold_query.iter_mut() {
         text.0 = game_state.gold.to_string();
+    }
+    for mut text in wood_query.iter_mut() {
+        text.0 = game_state.wood.to_string();
     }
 }

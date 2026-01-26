@@ -7,7 +7,7 @@ use crate::constants::{ARROW_SIZE, EXPLORE_COST, EXPLORE_RADIUS, SCALED_TILE_SIZ
 use crate::map::world_to_tile;
 use crate::module_bindings;
 use crate::module_bindings::{DbConnection, MyUserTableAccess, UserTableAccess};
-use crate::resources::{FogOfWar, GameState, TowerConfigs, TowerWheelState};
+use crate::resources::{BlockedTiles, FogOfWar, GameState, RecruitMenuState, TowerConfigs, TowerWheelState};
 
 //TODO Display for generated Types?!
 impl module_bindings::Color {
@@ -60,10 +60,13 @@ pub fn show_tower_wheel_menu(
     mut wheel_state: ResMut<TowerWheelState>,
     tower_configs: Res<TowerConfigs>,
     fog: Res<FogOfWar>,
+    recruit_menu_state: Res<RecruitMenuState>,
+    blocked_tiles: Res<BlockedTiles>,
     existing_menus: Query<Entity, With<TowerWheelMenu>>,
     stdb: Option<SpacetimeDB>,
 ) {
-    if mouse_button.just_pressed(MouseButton::Left) && !wheel_state.active {
+    // Don't show if recruit menu is active
+    if mouse_button.just_pressed(MouseButton::Left) && !wheel_state.active && !recruit_menu_state.active {
         let Ok(window) = windows.single() else { return };
         let Ok((camera, camera_transform)) = camera.single() else {
             return;
@@ -71,6 +74,18 @@ pub fn show_tower_wheel_menu(
 
         if let Some(cursor_pos) = window.cursor_position() {
             if let Ok(world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_pos) {
+                let (tile_x, tile_y) = world_to_tile(world_pos);
+
+                // Don't show tower wheel on castle (recruit menu handles that)
+                if blocked_tiles.is_castle(tile_x, tile_y) {
+                    return;
+                }
+
+                // Don't show tower wheel on road tiles
+                if blocked_tiles.is_road(tile_x, tile_y) {
+                    return;
+                }
+
                 // Clean up any existing menus
                 for entity in existing_menus.iter() {
                     commands.queue_silenced(move |world: &mut World| {
@@ -85,7 +100,6 @@ pub fn show_tower_wheel_menu(
                 wheel_state.position = world_pos;
 
                 // Check if clicked tile is in fog
-                let (tile_x, tile_y) = world_to_tile(world_pos);
                 let is_in_fog = !fog.is_explored(tile_x, tile_y);
 
                 if is_in_fog {

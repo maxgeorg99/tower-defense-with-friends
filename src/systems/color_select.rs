@@ -5,7 +5,7 @@ use spacetimedb_sdk::Table;
 use crate::auth::AuthState;
 use crate::module_bindings::set_color_reducer::set_color;
 use crate::module_bindings::set_name_reducer::set_name;
-use crate::module_bindings::{Color as PlayerColor, DbConnection, MyUserTableAccess};
+use crate::module_bindings::{Color as PlayerColor, DbConnection, UserTableAccess};
 use crate::resources::AppState;
 use crate::systems::menu::{ButtonStyle, spawn_nine_slice_button};
 
@@ -79,7 +79,7 @@ fn setup_color_select_screen(
             })
             .or_else(|| {
                 stdb.as_ref()
-                    .and_then(|db| db.db().my_user().iter().next())
+                    .and_then(|db| db.db().user().iter().next())
                     .and_then(|user| user.name.clone())
             })
             .unwrap_or_else(|| "Player".to_string());

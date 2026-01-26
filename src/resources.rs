@@ -15,6 +15,7 @@ pub struct StdbConfig {
 pub struct GameState {
     pub lives: i32,
     pub gold: i32,
+    pub wood: i32,
     pub wave: i32,
     pub score: i32,
 }
@@ -24,6 +25,7 @@ impl Default for GameState {
         Self {
             lives: 20,
             gold: 100,
+            wood: 0,
             wave: 1,
             score: 0,
         }
@@ -121,6 +123,47 @@ impl FogOfWar {
 }
 
 impl Default for FogOfWar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct RecruitMenuState {
+    pub active: bool,
+}
+
+/// Tracks tiles where building is not allowed (roads, castle, etc.)
+#[derive(Resource)]
+pub struct BlockedTiles {
+    /// Set of (tile_x, tile_y) coordinates that are blocked
+    pub tiles: std::collections::HashSet<(i32, i32)>,
+    /// Castle tile coordinates
+    pub castle_tiles: std::collections::HashSet<(i32, i32)>,
+}
+
+impl BlockedTiles {
+    pub fn new() -> Self {
+        Self {
+            tiles: std::collections::HashSet::new(),
+            castle_tiles: std::collections::HashSet::new(),
+        }
+    }
+
+    pub fn is_blocked(&self, tile_x: i32, tile_y: i32) -> bool {
+        self.tiles.contains(&(tile_x, tile_y))
+    }
+
+    pub fn is_castle(&self, tile_x: i32, tile_y: i32) -> bool {
+        self.castle_tiles.contains(&(tile_x, tile_y))
+    }
+
+    pub fn is_road(&self, tile_x: i32, tile_y: i32) -> bool {
+        self.tiles.contains(&(tile_x, tile_y)) && !self.castle_tiles.contains(&(tile_x, tile_y))
+    }
+}
+
+impl Default for BlockedTiles {
     fn default() -> Self {
         Self::new()
     }

@@ -169,26 +169,29 @@ fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
             MenuUI,
         ))
         .with_children(|parent| {  // <- Added this line!
-            // Buttons
-            spawn_nine_slice_button(
+            // Buttons with icons
+            spawn_nine_slice_button_with_icon(
                 parent,
                 &asset_server,
                 ButtonStyle::SmallBlueRound,
                 "PLAY",
+                Some("UI Elements/UI Elements/Icons/Play_Icon.png"),
                 PlayButton,
             );
-            spawn_nine_slice_button(
+            spawn_nine_slice_button_with_icon(
                 parent,
                 &asset_server,
                 ButtonStyle::SmallBlueRound,
                 "SETTINGS",
+                Some("UI Elements/UI Elements/Icons/Settings_Icon.png"),
                 SettingsButton,
             );
-            spawn_nine_slice_button(
+            spawn_nine_slice_button_with_icon(
                 parent,
                 &asset_server,
                 ButtonStyle::SmallRedRound,
                 "QUIT",
+                Some("UI Elements/UI Elements/Icons/Exit_Icon.png"),
                 QuitButton,
             );
         });
@@ -223,11 +226,23 @@ pub fn spawn_nine_slice_button<M: Component>(
     label: &str,
     marker: M,
 ) {
+    spawn_nine_slice_button_with_icon(parent, asset_server, style, label, None, marker);
+}
+
+pub fn spawn_nine_slice_button_with_icon<M: Component>(
+    parent: &mut ChildSpawnerCommands,
+    asset_server: &AssetServer,
+    style: ButtonStyle,
+    label: &str,
+    icon_path: Option<&str>,
+    marker: M,
+) {
     let (width, height) = style.default_size();
     let corner = style.corner_display_size();
     let (tile_size, gap) = style.grid_params();
     let texture = asset_server.load(style.regular_texture());
     let font_size = style.default_font_size();
+    let icon_handle = icon_path.map(|p| asset_server.load(p.to_string()));
 
     parent
         .spawn((
@@ -266,8 +281,10 @@ pub fn spawn_nine_slice_button<M: Component>(
                 },
                 Node {
                     display: Display::Flex,
+                    flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
+                    column_gap: Val::Px(8.0),
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
                     ..default()
@@ -275,6 +292,7 @@ pub fn spawn_nine_slice_button<M: Component>(
                 NineSlicePart,
             ))
             .with_children(|center| {
+                // Add text label
                 center.spawn((
                     Text::new(label.to_string()),
                     TextFont {
@@ -283,6 +301,17 @@ pub fn spawn_nine_slice_button<M: Component>(
                     },
                     TextColor(Color::WHITE),
                 ));
+                // Add icon if provided
+                if let Some(icon) = &icon_handle {
+                    center.spawn((
+                        ImageNode::new(icon.clone()),
+                        Node {
+                            width: Val::Px(24.0),
+                            height: Val::Px(24.0),
+                            ..default()
+                        },
+                    ));
+                }
             });
 
             spawn_grid_tile(btn, texture.clone(), tile_rect(5, tile_size, gap));

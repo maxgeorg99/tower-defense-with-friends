@@ -28,7 +28,7 @@ use bevy::BevyPlugin;
 #[cfg(feature = "bevy-demo")]
 use debug::DebugPlugin;
 use events::EventPlugin;
-use map::create_path_waypoints;
+use map::{create_path_waypoints, create_blocked_tiles};
 use resources::*;
 use systems::*;
 
@@ -100,12 +100,17 @@ fn main() {
             position: Vec2::ZERO,
         })
         .insert_resource(FogOfWar::new())
+        .init_resource::<RecruitMenuState>()
+        .insert_resource({
+            let (blocked, castle) = create_blocked_tiles();
+            BlockedTiles { tiles: blocked, castle_tiles: castle }
+        })
         .add_systems(Startup, setup_camera)
         .add_systems(Update, (handle_login_request, check_auth_and_connect))
         .add_systems(OnEnter(AppState::ColorSelect), connect_to_spacetimedb)
         .add_systems(
             OnEnter(AppState::InGame),
-            (setup_game, setup_fog_of_war, setup_online_users_ui, setup_top_bar).chain(),
+            (setup_game, setup_fog_of_war, setup_online_users_ui, setup_top_bar, setup_resource_gathering).chain(),
         )
         .add_systems(
             Update,
@@ -132,7 +137,10 @@ fn main() {
                 move_projectiles,
                 handle_projectile_hits,
                 update_health_bars,
-                update_top_bar
+                update_top_bar,
+                show_recruit_menu,
+                hide_recruit_menu,
+                handle_recruit_selection,
             )
                 .run_if(in_state(AppState::InGame)),
         )
@@ -142,6 +150,18 @@ fn main() {
                 cleanup_dead_enemies,
                 check_game_over,
                 update_fog_visibility,
+            )
+                .run_if(in_state(AppState::InGame)),
+        )
+        .add_systems(
+            Update,
+            (
+                spawn_workers,
+                worker_find_resource,
+                worker_movement,
+                worker_arrive_check,
+                worker_harvest,
+                worker_sprite_update,
             )
                 .run_if(in_state(AppState::InGame)),
         )

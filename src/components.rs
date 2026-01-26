@@ -64,3 +64,66 @@ pub struct FogTile {
 
 #[derive(Component)]
 pub struct GameOverScreen;
+
+// Resource types
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ResourceType {
+    Wood,
+}
+
+// Worker state machine
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum WorkerState {
+    #[default]
+    Idle,
+    MovingToResource,
+    Harvesting,
+    ReturningWithResource,
+}
+
+// Worker component
+#[derive(Component)]
+pub struct Worker {
+    pub speed: f32,
+    pub home_building: Entity,
+}
+
+// Target for workers
+#[derive(Component)]
+pub struct WorkerTarget {
+    pub target_entity: Option<Entity>,
+    pub target_position: Vec2,
+}
+
+// Resource node (tree)
+#[derive(Component)]
+pub struct ResourceNode {
+    pub resource_type: ResourceType,
+    pub remaining: i32,
+}
+
+// Marker for depleted resource
+#[derive(Component)]
+pub struct Depleted;
+
+// Building that spawns workers
+#[derive(Component)]
+pub struct WorkerBuilding {
+    pub spawn_timer: Timer,
+    pub max_workers: i32,
+    pub spawned_workers: i32,
+}
+
+// Harvest progress timer
+#[derive(Component)]
+pub struct HarvestTimer(pub Timer);
+
+// Recruit menu components
+#[derive(Component)]
+pub struct RecruitMenu;
+
+#[derive(Component)]
+pub struct RecruitOption {
+    pub unit_id: String,
+    pub wood_cost: i32,
+}
