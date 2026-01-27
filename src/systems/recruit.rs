@@ -4,7 +4,7 @@ use bevy_spacetimedb::StdbConnection;
 use spacetimedb_sdk::Table;
 use crate::components::{RecruitMenu, RecruitOption};
 use crate::map::world_to_tile;
-use crate::module_bindings::{DbConnection, Color as PlayerColor, UserTableAccess};
+use crate::module_bindings::{DbConnection, Color as PlayerColor, MyUserTableAccess};
 use crate::resources::{BlockedTiles, GameState, RecruitMenuState, TowerWheelState};
 
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
@@ -61,7 +61,7 @@ fn get_color_dir(color: PlayerColor) -> &'static str {
 
 fn get_player_color(stdb: &Option<SpacetimeDB>) -> PlayerColor {
     stdb.as_ref()
-        .and_then(|db| db.db().user().iter().next())
+        .and_then(|db| db.db().my_user().iter().next())
         .map(|user| user.color)
         .unwrap_or(PlayerColor::Blue)
 }

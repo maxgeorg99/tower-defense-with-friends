@@ -204,22 +204,44 @@ fn spawn_enemy_row(
             ..default()
         })
         .with_children(|row| {
-            // Left side: Avatar and name
             row.spawn(Node {
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(10.0),
                 ..default()
             })
                 .with_children(|left| {
-                    // Avatar
-                    left.spawn((
-                        ImageNode::new(asset_server.load(&unit.avatar_path)),
-                        Node {
-                            width: Val::Px(40.0),
-                            height: Val::Px(40.0),
-                            ..default()
-                        },
-                    ));
+                    left.spawn(Node {
+                        width: Val::Px(50.0),
+                        height: Val::Px(50.0),
+                        position_type: PositionType::Relative,
+                        ..default()
+                    })
+                        .with_children(|avatar| {
+                            // Avatar image
+                            avatar.spawn((
+                                ImageNode::new(asset_server.load(&unit.avatar_path)),
+                                Node {
+                                    width: Val::Px(50.0),
+                                    height: Val::Px(50.0),
+                                    ..default()
+                                },
+                            ));
+
+                            // Defense type icon
+                            avatar.spawn((
+                                ImageNode::new(asset_server.load(
+                                    get_defense_type_icon(unit.defense_type.as_str())
+                                )),
+                                Node {
+                                    width: Val::Px(18.0),
+                                    height: Val::Px(18.0),
+                                    position_type: PositionType::Absolute,
+                                    right: Val::Px(-4.0),
+                                    bottom: Val::Px(-4.0),
+                                    ..default()
+                                },
+                            ));
+                        });
 
                     // Enemy name
                     left.spawn((
@@ -232,7 +254,7 @@ fn spawn_enemy_row(
                     ));
                 });
 
-            // Right side: Count with subtle background
+            // Right side: Count
             row.spawn((
                 Node {
                     width: Val::Px(32.0),
@@ -241,7 +263,7 @@ fn spawn_enemy_row(
                     align_items: AlignItems::Center,
                     ..default()
                 },
-                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.3)), // Subtle dark background
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.3)),
                 BorderRadius::all(Val::Px(16.0)),
             ))
                 .with_child((
@@ -253,6 +275,16 @@ fn spawn_enemy_row(
                     TextColor(Color::WHITE),
                 ));
         });
+}
+
+
+fn get_defense_type_icon(defense_type: &str) -> &'static str {
+    match defense_type {
+        "armor" => "UI Elements/UI Elements/Icons/Defense_Icon.png",
+        "agility" => "UI Elements/UI Elements/Icons/Agility_Icon.png",
+        "mystical" => "UI Elements/UI Elements/Icons/Mystical_Icon.png",
+        _ => "UI Elements/UI Elements/Icons/Defense_Icon.png",
+    }
 }
 
 /// Update the timer text every frame

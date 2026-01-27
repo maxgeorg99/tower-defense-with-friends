@@ -19,6 +19,11 @@ pub fn on_connected(messages: Option<ReadStdbConnectedMessage>, stdb: Option<Spa
             .on_applied(|_| info!("User subscription applied"))
             .on_error(|_, err| error!("User subscription failed: {}", err))
             .subscribe("SELECT * FROM user");
+
+        stdb.subscription_builder()
+            .on_applied(|_| info!("My User subscription applied"))
+            .on_error(|_, err| error!("My User subscription failed: {}", err))
+            .subscribe("SELECT * FROM my_user");
     }
 }
 

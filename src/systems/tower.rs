@@ -427,7 +427,7 @@ pub fn tower_shooting(
 
 fn get_user_color(stdb: Option<&SpacetimeDB>) -> module_bindings::Color {
     stdb
-        .and_then(|stdb| stdb.db().user().iter().next().map(|user| user.color))
+        .and_then(|stdb| stdb.db().my_user().iter().next().map(|user| user.color))
         .unwrap_or(module_bindings::Color::Blue)
 }
 

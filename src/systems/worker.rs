@@ -9,7 +9,7 @@ use crate::components::{
 };
 use crate::constants::SCALED_TILE_SIZE;
 use crate::map::tile_to_world;
-use crate::module_bindings::{Color as PlayerColor, DbConnection, UserTableAccess};
+use crate::module_bindings::{Color as PlayerColor, DbConnection, MyUserTableAccess};
 use crate::resources::{GameState, HouseMenuState, RecruitMenuState, TowerUpgradeMenuState, TowerWheelState};
 use crate::systems::AnimationInfo;
 
@@ -37,7 +37,7 @@ fn get_color_dir(color: PlayerColor) -> &'static str {
 /// Get the current player's color from SpacetimeDB, defaulting to Blue
 fn get_player_color(stdb: &Option<SpacetimeDB>) -> PlayerColor {
     stdb.as_ref()
-        .and_then(|db| db.db().user().iter().next())
+        .and_then(|db| db.db().my_user().iter().next())
         .map(|user| user.color)
         .unwrap_or(PlayerColor::Blue)
 }
