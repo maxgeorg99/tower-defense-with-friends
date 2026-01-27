@@ -6,7 +6,7 @@ use crate::components::{Castle, FogTile, GameUI};
 use crate::constants::{CASTLE_SIZE, MAP_HEIGHT, MAP_SCALE, MAP_WIDTH, SCALED_TILE_SIZE};
 use crate::map::tile_to_world;
 use crate::module_bindings::{Color as PlayerColor, DbConnection, UserTableAccess, RemoteModule};
-use crate::resources::{FogOfWar, StdbConfig};
+use crate::resources::{BlockedTiles, FogOfWar, StdbConfig};
 
 /// Type alias for cleaner SpacetimeDB resource access
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
@@ -79,6 +79,7 @@ pub fn setup_fog_of_war(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut fog: ResMut<FogOfWar>,
+    blocked_tiles: Res<BlockedTiles>,
 ) {
     // Castle is at world position (400.0, 0.0), which is approximately tile (27, 10)
     // Explore a larger area (radius 8) around the castle
@@ -87,6 +88,11 @@ pub fn setup_fog_of_war(
     const INITIAL_EXPLORE_RADIUS: i32 = 8;
 
     fog.explore_rect(CASTLE_TILE_X, CASTLE_TILE_Y, INITIAL_EXPLORE_RADIUS);
+
+    // Always reveal the road/path tiles so enemies are visible
+    for (tile_x, tile_y) in blocked_tiles.tiles.iter() {
+        fog.set_explored(*tile_x, *tile_y, true);
+    }
 
     // Load the shadow texture for fog
     let fog_texture = asset_server.load("Terrain/Shadow.png");
