@@ -130,12 +130,15 @@ pub fn show_tower_wheel_menu(
                 // Check if clicked tile is in fog
                 let is_in_fog = !fog.is_explored(tile_x, tile_y);
 
+                // Load paper background texture
+                let paper_texture = asset_server.load("UI Elements/UI Elements/Papers/SpecialPaper.png");
+
                 if is_in_fog {
                     // Show explore option only
                     let circle_entity = commands
                         .spawn((
                             Sprite {
-                                color: Color::srgba(0.1, 0.5, 0.1, 0.8),
+                                image: paper_texture.clone(),
                                 custom_size: Some(Vec2::splat(70.0)),
                                 ..default()
                             },
@@ -184,12 +187,12 @@ pub fn show_tower_wheel_menu(
                         let offset_x = angle.cos() * radius;
                         let offset_y = angle.sin() * radius;
 
-                        // Create background circle
+                        // Create background with paper texture
                         let circle_entity = commands
                             .spawn((
                                 Sprite {
-                                    color: Color::srgba(0.2, 0.2, 0.8, 0.7),
-                                    custom_size: Some(Vec2::splat(60.0)),
+                                    image: paper_texture.clone(),
+                                    custom_size: Some(Vec2::splat(70.0)),
                                     ..default()
                                 },
                                 Transform::from_xyz(
