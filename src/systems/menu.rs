@@ -148,7 +148,7 @@ fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
             height: Val::Percent(100.0),
             ..default()
         },
-        ImageNode::new(asset_server.load("MenuBackground.png")),
+        ImageNode::new(asset_server.load("MenuBackgroundV2.png")),
         ZIndex(-1000),
         MenuUI
     ));
@@ -201,7 +201,7 @@ fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: Val::Px(50.0),
+                bottom: Val::Px(50.0),
                 right: Val::Px(50.0),
                 ..default()
             },
