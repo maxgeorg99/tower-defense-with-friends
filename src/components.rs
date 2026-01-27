@@ -137,6 +137,8 @@ pub struct GameOverScreen;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ResourceType {
     Wood,
+    Gold,
+    Meat,
 }
 
 // Worker state machine
@@ -154,6 +156,7 @@ pub enum WorkerState {
 pub struct Worker {
     pub speed: f32,
     pub home_building: Entity,
+    pub current_resource: Option<ResourceType>,
 }
 
 // Target for workers
@@ -178,8 +181,10 @@ pub struct Depleted;
 #[derive(Component)]
 pub struct WorkerBuilding {
     pub spawn_timer: Timer,
-    pub max_workers: i32,
-    pub spawned_workers: i32,
+    /// How many workers this building can have (increases when buying workers)
+    pub worker_capacity: i32,
+    /// How many workers have been spawned so far
+    pub current_workers: i32,
 }
 
 // Harvest progress timer
@@ -193,7 +198,7 @@ pub struct RecruitMenu;
 #[derive(Component)]
 pub struct RecruitOption {
     pub unit_id: String,
-    pub wood_cost: i32,
+    pub meat_cost: i32,
 }
 
 // House menu components

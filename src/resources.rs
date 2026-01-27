@@ -16,6 +16,7 @@ pub struct GameState {
     pub lives: i32,
     pub gold: i32,
     pub wood: i32,
+    pub meat: i32,
     pub wave: i32,
     pub score: i32,
 }
@@ -26,6 +27,7 @@ impl Default for GameState {
             lives: 20,
             gold: 100,
             wood: 0,
+            meat: 0,
             wave: 1,
             score: 0,
         }

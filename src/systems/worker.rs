@@ -17,14 +17,12 @@ use crate::systems::AnimationInfo;
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
 
 const PAWN_FRAME_SIZE: UVec2 = UVec2::new(192, 192);
-const WORKER_SPEED: f32 = 60.0;
-const HARVEST_TIME: f32 = 2.0;
+const WORKER_SPEED: f32 = 30.0;
+const HARVEST_TIME: f32 = 5.0;
 const ARRIVAL_DISTANCE: f32 = 16.0;
 
-// Asset sizes for proper scaling (like towers: use min of x/y scale to fit in 1 tile)
-// Doubled to make them half size
+// Asset sizes for proper scaling
 const HOUSE_SIZE: Vec2 = Vec2::new(128.0, 128.0);
-const TREE_SIZE: Vec2 = Vec2::new(128.0, 128.0);
 
 /// Get the color directory name for asset paths
 fn get_color_dir(color: PlayerColor) -> &'static str {
@@ -44,7 +42,7 @@ fn get_player_color(stdb: &Option<SpacetimeDB>) -> PlayerColor {
         .unwrap_or(PlayerColor::Blue)
 }
 
-/// Setup resource gathering - spawns building and trees
+/// Setup resource gathering - spawns building, trees, gold mines, and sheep
 pub fn setup_resource_gathering(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -60,36 +58,120 @@ pub fn setup_resource_gathering(
     let house_scale_x = SCALED_TILE_SIZE / HOUSE_SIZE.x;
     let house_scale_y = SCALED_TILE_SIZE / HOUSE_SIZE.y;
     let house_scale = house_scale_x.min(house_scale_y);
-    let building_entity = commands
+    let _building_entity = commands
         .spawn((
             Sprite::from_image(asset_server.load(&building_path)),
             Transform::from_xyz(building_pos.x, building_pos.y, 1.0)
                 .with_scale(Vec3::splat(house_scale)),
             WorkerBuilding {
                 spawn_timer: Timer::from_seconds(3.0, TimerMode::Repeating),
-                max_workers: 4,
-                spawned_workers: 0,
+                worker_capacity: 1,
+                current_workers: 0,
             },
         ))
         .id();
 
-    // Spawn trees in a cluster near the castle (not in a line)
-    // Scale trees like towers: use min of x/y scale to fit in 1 tile
-    let tree_scale_x = SCALED_TILE_SIZE / TREE_SIZE.x;
-    let tree_scale_y = SCALED_TILE_SIZE / TREE_SIZE.y;
-    let tree_scale = tree_scale_x.min(tree_scale_y);
+    const TREE_FRAME_SIZE: UVec2 = UVec2::new(192, 256);
+    let tree_scale = SCALED_TILE_SIZE / TREE_FRAME_SIZE.x as f32;
     let tree_positions = [(22, 15), (22, 14), (21, 16)];
     for (i, (tx, ty)) in tree_positions.iter().enumerate() {
         let tree_pos = tile_to_world(*tx, *ty);
         let tree_sprite = format!("Terrain/Resources/Wood/Trees/Tree{}.png", (i % 4) + 1);
 
+        let texture = asset_server.load(&tree_sprite);
+        let layout = TextureAtlasLayout::from_grid(TREE_FRAME_SIZE, 8, 1, None, None);
+        let texture_atlas_layout = asset_server.add(layout);
+
         commands.spawn((
-            Sprite::from_image(asset_server.load(&tree_sprite)),
+            Sprite::from_atlas_image(
+                texture,
+                TextureAtlas {
+                    layout: texture_atlas_layout,
+                    index: 0,
+                },
+            ),
             Transform::from_xyz(tree_pos.x, tree_pos.y, 1.0)
                 .with_scale(Vec3::splat(tree_scale)),
             ResourceNode {
                 resource_type: ResourceType::Wood,
                 remaining: 5,
+            },
+            AnimationTimer {
+                timer: Timer::from_seconds(1.0, TimerMode::Repeating),
+            },
+            AnimationInfo {
+                frame_count: 8,
+            },
+        ));
+    }
+
+    // === GOLD: Gold stones (animated highlight sprite sheets, 6 frames of 128x128) ===
+    const GOLD_FRAME_SIZE: UVec2 = UVec2::new(128, 128);
+    let gold_scale = SCALED_TILE_SIZE / GOLD_FRAME_SIZE.x as f32;
+    let gold_positions = [(24, 17), (25, 17), (24, 18)];
+    for (i, (gx, gy)) in gold_positions.iter().enumerate() {
+        let gold_pos = tile_to_world(*gx, *gy);
+        // Use larger gold stones with highlight animation (4, 5, 6)
+        let gold_sprite = format!("Terrain/Resources/Gold/Gold Stones/Gold Stone {}_Highlight.png", (i % 3) + 4);
+
+        let texture = asset_server.load(&gold_sprite);
+        let layout = TextureAtlasLayout::from_grid(GOLD_FRAME_SIZE, 6, 1, None, None);
+        let texture_atlas_layout = asset_server.add(layout);
+
+        commands.spawn((
+            Sprite::from_atlas_image(
+                texture,
+                TextureAtlas {
+                    layout: texture_atlas_layout,
+                    index: 0,
+                },
+            ),
+            Transform::from_xyz(gold_pos.x, gold_pos.y, 1.0)
+                .with_scale(Vec3::splat(gold_scale)),
+            ResourceNode {
+                resource_type: ResourceType::Gold,
+                remaining: 8,
+            },
+            AnimationTimer {
+                timer: Timer::from_seconds(0.25, TimerMode::Repeating),
+            },
+            AnimationInfo {
+                frame_count: 6,
+            },
+        ));
+    }
+
+    // === MEAT: Sheep (animated sprite sheets, 6 frames of 128x128) ===
+    const SHEEP_FRAME_SIZE: UVec2 = UVec2::new(128, 128);
+    let sheep_scale = SCALED_TILE_SIZE / SHEEP_FRAME_SIZE.x as f32;
+    let sheep_positions = [(20, 12), (19, 13), (20, 14)];
+    for (_i, (sx, sy)) in sheep_positions.iter().enumerate() {
+        let sheep_pos = tile_to_world(*sx, *sy);
+
+        // Create animated sheep sprite
+        let texture = asset_server.load("Terrain/Resources/Meat/Sheep/Sheep_Idle.png");
+        let layout = TextureAtlasLayout::from_grid(SHEEP_FRAME_SIZE, 6, 1, None, None);
+        let texture_atlas_layout = asset_server.add(layout);
+
+        commands.spawn((
+            Sprite::from_atlas_image(
+                texture,
+                TextureAtlas {
+                    layout: texture_atlas_layout,
+                    index: 0,
+                },
+            ),
+            Transform::from_xyz(sheep_pos.x, sheep_pos.y, 1.0)
+                .with_scale(Vec3::splat(sheep_scale)),
+            ResourceNode {
+                resource_type: ResourceType::Meat,
+                remaining: 3,
+            },
+            AnimationTimer {
+                timer: Timer::from_seconds(1.0, TimerMode::Repeating),
+            },
+            AnimationInfo {
+                frame_count: 6,
             },
         ));
     }
@@ -109,13 +191,13 @@ pub fn spawn_workers(
     for (building_entity, mut building, building_transform) in buildings.iter_mut() {
         building.spawn_timer.tick(time.delta());
 
-        if building.spawn_timer.just_finished() && building.spawned_workers < building.max_workers {
+        if building.spawn_timer.just_finished() && building.current_workers < building.worker_capacity {
             let spawn_pos = building_transform.translation.truncate();
 
             // Load pawn idle sprite sheet with dynamic color
             let texture_path = format!("Units/{} Units/Pawn/Pawn_Idle.png", color_dir);
             let texture = asset_server.load(&texture_path);
-            let layout = TextureAtlasLayout::from_grid(PAWN_FRAME_SIZE, 6, 1, None, None);
+            let layout = TextureAtlasLayout::from_grid(PAWN_FRAME_SIZE, 8, 1, None, None);
             let texture_atlas_layout = asset_server.add(layout);
 
             // Scale pawns same as enemies: SCALED_TILE_SIZE / frame_size
@@ -134,6 +216,7 @@ pub fn spawn_workers(
                 Worker {
                     speed: WORKER_SPEED,
                     home_building: building_entity,
+                    current_resource: None,
                 },
                 WorkerState::Idle,
                 AnimationTimer {
@@ -144,7 +227,7 @@ pub fn spawn_workers(
                 },
             ));
 
-            building.spawned_workers += 1;
+            building.current_workers += 1;
         }
     }
 }
@@ -152,11 +235,11 @@ pub fn spawn_workers(
 /// Assign idle workers to nearby resource nodes
 pub fn worker_find_resource(
     mut commands: Commands,
-    workers: Query<(Entity, &Transform, &Worker), (With<WorkerState>, Without<WorkerTarget>)>,
+    mut workers: Query<(Entity, &Transform, &mut Worker), (With<WorkerState>, Without<WorkerTarget>)>,
     worker_states: Query<&WorkerState>,
     resources: Query<(Entity, &Transform, &ResourceNode), Without<Depleted>>,
 ) {
-    for (worker_entity, worker_transform, worker) in workers.iter() {
+    for (worker_entity, worker_transform, mut worker) in workers.iter_mut() {
         let state = worker_states.get(worker_entity).unwrap();
         if *state != WorkerState::Idle {
             continue;
@@ -164,18 +247,19 @@ pub fn worker_find_resource(
 
         // Find nearest undepleted resource
         let worker_pos = worker_transform.translation.truncate();
-        let mut nearest: Option<(Entity, Vec2, f32)> = None;
+        let mut nearest: Option<(Entity, Vec2, f32, ResourceType)> = None;
 
-        for (res_entity, res_transform, _resource) in resources.iter() {
+        for (res_entity, res_transform, resource) in resources.iter() {
             let res_pos = res_transform.translation.truncate();
             let dist = worker_pos.distance(res_pos);
 
             if nearest.is_none() || dist < nearest.unwrap().2 {
-                nearest = Some((res_entity, res_pos, dist));
+                nearest = Some((res_entity, res_pos, dist, resource.resource_type));
             }
         }
 
-        if let Some((target_entity, target_pos, _)) = nearest {
+        if let Some((target_entity, target_pos, _, resource_type)) = nearest {
+            worker.current_resource = Some(resource_type);
             commands.entity(worker_entity).insert((
                 WorkerTarget {
                     target_entity: Some(target_entity),
@@ -217,31 +301,45 @@ pub fn worker_arrive_check(
     mut commands: Commands,
     mut game_state: ResMut<GameState>,
     buildings: Query<&Transform, With<WorkerBuilding>>,
-    mut workers: Query<(Entity, &Transform, &mut WorkerState, &WorkerTarget, &Worker)>,
+    mut workers: Query<(Entity, &Transform, &mut WorkerState, &WorkerTarget, &mut Worker)>,
 ) {
-    for (worker_entity, worker_transform, mut state, target, worker) in workers.iter_mut() {
+    for (worker_entity, worker_transform, mut state, target, mut worker) in workers.iter_mut() {
         let worker_pos = worker_transform.translation.truncate();
-        let dist = worker_pos.distance(target.target_position);
 
-        if dist < ARRIVAL_DISTANCE {
-            match *state {
-                WorkerState::MovingToResource => {
+        match *state {
+            WorkerState::MovingToResource => {
+                // Check distance to resource target
+                let dist = worker_pos.distance(target.target_position);
+                if dist < ARRIVAL_DISTANCE {
                     // Start harvesting
                     *state = WorkerState::Harvesting;
                     commands
                         .entity(worker_entity)
                         .insert(HarvestTimer(Timer::from_seconds(HARVEST_TIME, TimerMode::Once)));
                 }
-                WorkerState::ReturningWithResource => {
-                    // Deposit resource and go idle
-                    if buildings.get(worker.home_building).is_ok() {
-                        game_state.wood += 1;
+            }
+            WorkerState::ReturningWithResource => {
+                // Check distance to the ACTUAL building, not target.target_position
+                // (target might not be updated yet due to deferred commands)
+                if let Ok(building_transform) = buildings.get(worker.home_building) {
+                    let building_pos = building_transform.translation.truncate();
+                    let dist_to_building = worker_pos.distance(building_pos);
+
+                    if dist_to_building < ARRIVAL_DISTANCE {
+                        // Deposit resource and go idle
+                        match worker.current_resource {
+                            Some(ResourceType::Wood) => game_state.wood += 1,
+                            Some(ResourceType::Gold) => game_state.gold += 5,
+                            Some(ResourceType::Meat) => game_state.meat += 1,
+                            None => {}
+                        }
+                        worker.current_resource = None;
                         commands.entity(worker_entity).remove::<WorkerTarget>();
                         *state = WorkerState::Idle;
                     }
                 }
-                _ => {}
             }
+            _ => {}
         }
     }
 }
@@ -277,10 +375,30 @@ pub fn worker_harvest(
                     resource.remaining -= 1;
 
                     if resource.remaining <= 0 {
-                        // Resource depleted - change to stump
-                        commands.entity(res_entity).insert(Depleted);
-                        res_sprite.image =
-                            asset_server.load("Terrain/Resources/Wood/Trees/Stump 1.png");
+                        // Resource depleted - handle based on type
+                        match resource.resource_type {
+                            ResourceType::Wood => {
+                                // Wood turns into a stump (persists but marked depleted)
+                                // Remove animation components since stump is static
+                                commands.entity(res_entity)
+                                    .insert(Depleted)
+                                    .remove::<AnimationTimer>()
+                                    .remove::<AnimationInfo>();
+                                // Change to static stump image
+                                res_sprite.image =
+                                    asset_server.load("Terrain/Resources/Wood/Trees/Stump 1.png");
+                                // Remove texture atlas to use as regular sprite
+                                res_sprite.texture_atlas = None;
+                            }
+                            ResourceType::Gold => {
+                                // Gold stone disappears when fully harvested
+                                commands.entity(res_entity).despawn();
+                            }
+                            ResourceType::Meat => {
+                                // Sheep disappears when fully harvested
+                                commands.entity(res_entity).despawn();
+                            }
+                        }
                     }
                 }
             }
@@ -301,24 +419,40 @@ pub fn worker_harvest(
 
 pub fn worker_sprite_update(
     asset_server: Res<AssetServer>,
-    mut workers: Query<(&WorkerState, &mut Sprite), Changed<WorkerState>>,
+    mut workers: Query<(&WorkerState, &Worker, &mut Sprite, &mut AnimationInfo), Changed<WorkerState>>,
     stdb: Option<SpacetimeDB>,
 ) {
     let color = get_player_color(&stdb);
     let color_dir = get_color_dir(color);
 
-    for (state, mut sprite) in workers.iter_mut() {
-        let sprite_name = match state {
-            WorkerState::Idle => "Pawn_Idle.png",
-            WorkerState::MovingToResource => "Pawn_Run Axe.png",
-            WorkerState::Harvesting => "Pawn_Interact Axe.png",
-            WorkerState::ReturningWithResource => "Pawn_Run Wood.png",
+    for (state, worker, mut sprite, mut anim_info) in workers.iter_mut() {
+        // Returns (sprite_name, frame_count)
+        let (sprite_name, frame_count) = match (state, worker.current_resource) {
+            (WorkerState::Idle, _) => ("Pawn_Idle.png", 8),
+            // Moving to resource - use tool based on resource type
+            (WorkerState::MovingToResource, Some(ResourceType::Wood)) => ("Pawn_Run Axe.png", 6),
+            (WorkerState::MovingToResource, Some(ResourceType::Gold)) => ("Pawn_Run Pickaxe.png", 6),
+            (WorkerState::MovingToResource, Some(ResourceType::Meat)) => ("Pawn_Run Knife.png", 6),
+            (WorkerState::MovingToResource, None) => ("Pawn_Run.png", 8),
+            // Harvesting - use interact animation based on resource type
+            (WorkerState::Harvesting, Some(ResourceType::Wood)) => ("Pawn_Interact Axe.png", 6),
+            (WorkerState::Harvesting, Some(ResourceType::Gold)) => ("Pawn_Interact Pickaxe.png", 6),
+            (WorkerState::Harvesting, Some(ResourceType::Meat)) => ("Pawn_Interact Knife.png", 4), // Only 4 frames!
+            (WorkerState::Harvesting, None) => ("Pawn_Idle.png", 8),
+            // Returning with resource - carry the resource
+            (WorkerState::ReturningWithResource, Some(ResourceType::Wood)) => ("Pawn_Run Wood.png", 6),
+            (WorkerState::ReturningWithResource, Some(ResourceType::Gold)) => ("Pawn_Run Gold.png", 6),
+            (WorkerState::ReturningWithResource, Some(ResourceType::Meat)) => ("Pawn_Run Meat.png", 6),
+            (WorkerState::ReturningWithResource, None) => ("Pawn_Run.png", 6),
         };
 
         let texture_path = format!("Units/{} Units/Pawn/{}", color_dir, sprite_name);
 
         // Update the sprite image
         sprite.image = asset_server.load(&texture_path);
+
+        // Update frame count for this animation
+        anim_info.frame_count = frame_count;
 
         // Reset to first frame when state changes
         if let Some(atlas) = &mut sprite.texture_atlas {
@@ -545,22 +679,22 @@ pub fn handle_build_worker(
 
                     let texture_path = format!("Units/{} Units/Pawn/Pawn_Idle.png", color_dir);
                     let texture = asset_server.load(&texture_path);
-                    let layout = TextureAtlasLayout::from_grid(PAWN_FRAME_SIZE, 6, 1, None, None);
+                    let layout = TextureAtlasLayout::from_grid(PAWN_FRAME_SIZE, 8, 1, None, None);
                     let texture_atlas_layout = asset_server.add(layout);
                     let pawn_scale = SCALED_TILE_SIZE / PAWN_FRAME_SIZE.x as f32;
 
                     commands.spawn((
                         Sprite::from_atlas_image(texture, TextureAtlas { layout: texture_atlas_layout, index: 0 }),
                         Transform::from_xyz(spawn_pos.x, spawn_pos.y, 2.0).with_scale(Vec3::splat(pawn_scale)),
-                        Worker { speed: WORKER_SPEED, home_building: building_entity },
+                        Worker { speed: WORKER_SPEED, home_building: building_entity, current_resource: None },
                         WorkerState::Idle,
                         AnimationTimer { timer: Timer::from_seconds(0.15, TimerMode::Repeating) },
                         AnimationInfo { frame_count: 6 },
                     ));
 
-                    building.spawned_workers += 1;
-                    building.max_workers += 1;
-                    info!("Worker built for {} gold! Total: {}", option.gold_cost, building.spawned_workers);
+                    building.current_workers += 1;
+                    building.worker_capacity += 1;
+                    info!("Worker built for {} gold! Total: {}", option.gold_cost, building.current_workers);
                 }
 
                 for entity in menu_entities.iter() {

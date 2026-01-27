@@ -16,6 +16,9 @@ pub struct GoldText;
 pub struct WoodText;
 
 #[derive(Component)]
+pub struct MeatText;
+
+#[derive(Component)]
 pub struct EffectivenessHint;
 
 // Setup top bar
@@ -46,6 +49,12 @@ pub fn setup_top_bar(mut commands: Commands, asset_server: Res<AssetServer>) {
                 &asset_server,
                 "Terrain/Resources/Wood/Wood Resource/Wood Resource.png",
                 WoodText,
+            );
+            spawn_stat_display(
+                parent,
+                &asset_server,
+                "Terrain/Resources/Meat/Meat Resource/Meat Resource.png",
+                MeatText,
             );
             spawn_stat_display(
                 parent,
@@ -94,9 +103,10 @@ fn spawn_stat_display(
 // Update function
 pub fn update_top_bar(
     game_state: Res<GameState>,
-    mut lives_query: Query<&mut Text, (With<LivesText>, Without<GoldText>, Without<WoodText>)>,
-    mut gold_query: Query<&mut Text, (With<GoldText>, Without<LivesText>, Without<WoodText>)>,
-    mut wood_query: Query<&mut Text, (With<WoodText>, Without<LivesText>, Without<GoldText>)>,
+    mut lives_query: Query<&mut Text, (With<LivesText>, Without<GoldText>, Without<WoodText>, Without<MeatText>)>,
+    mut gold_query: Query<&mut Text, (With<GoldText>, Without<LivesText>, Without<WoodText>, Without<MeatText>)>,
+    mut wood_query: Query<&mut Text, (With<WoodText>, Without<LivesText>, Without<GoldText>, Without<MeatText>)>,
+    mut meat_query: Query<&mut Text, (With<MeatText>, Without<LivesText>, Without<GoldText>, Without<WoodText>)>,
 ) {
     for mut text in lives_query.iter_mut() {
         text.0 = game_state.lives.to_string();
@@ -106,6 +116,9 @@ pub fn update_top_bar(
     }
     for mut text in wood_query.iter_mut() {
         text.0 = game_state.wood.to_string();
+    }
+    for mut text in meat_query.iter_mut() {
+        text.0 = game_state.meat.to_string();
     }
 }
 

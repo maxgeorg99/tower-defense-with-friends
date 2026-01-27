@@ -16,7 +16,7 @@ struct RecruitableUnit {
     /// Sprite path template with {color} placeholder
     sprite_path: &'static str,
     frame_size: (u32, u32),
-    wood_cost: i32,
+    meat_cost: i32,
 }
 
 const RECRUITABLE_UNITS: &[RecruitableUnit] = &[
@@ -25,28 +25,28 @@ const RECRUITABLE_UNITS: &[RecruitableUnit] = &[
         name: "WARRIOR",
         sprite_path: "Units/{color} Units/Warrior/Warrior_Idle.png",
         frame_size: (192, 192),
-        wood_cost: 50,
+        meat_cost: 5,
     },
     RecruitableUnit {
         id: "lancer",
         name: "LANCER",
         sprite_path: "Units/{color} Units/Lancer/Lancer_Idle.png",
         frame_size: (320, 320),
-        wood_cost: 30,
+        meat_cost: 3,
     },
     RecruitableUnit {
         id: "archer",
         name: "ARCHER",
         sprite_path: "Units/{color} Units/Archer/Archer_Idle.png",
         frame_size: (192, 192),
-        wood_cost: 20,
+        meat_cost: 2,
     },
     RecruitableUnit {
         id: "monk",
         name: "MONK",
         sprite_path: "Units/{color} Units/Monk/Idle.png",
         frame_size: (192, 192),
-        wood_cost: 25,
+        meat_cost: 3,
     },
 ];
 
@@ -110,8 +110,8 @@ fn spawn_recruit_menu(
     texture_atlases: &mut ResMut<Assets<TextureAtlasLayout>>,
     player_color: PlayerColor,
 ) {
-    // Load wood icon for cost display
-    let wood_icon = asset_server.load("Terrain/Resources/Wood/Wood Resource/Wood Resource.png");
+    // Load meat icon for cost display
+    let meat_icon = asset_server.load("Terrain/Resources/Meat/Meat Resource/Meat Resource.png");
     let color_dir = get_color_dir(player_color);
 
     // Pre-load unit textures and create atlas layouts
@@ -176,7 +176,7 @@ fn spawn_recruit_menu(
                         .with_children(|cards_row| {
                             for (i, unit) in RECRUITABLE_UNITS.iter().enumerate() {
                                 let (texture, layout) = unit_images[i].clone();
-                                spawn_unit_card(cards_row, &wood_icon, unit, texture, layout);
+                                spawn_unit_card(cards_row, &meat_icon, unit, texture, layout);
                             }
                         });
 
@@ -195,7 +195,7 @@ fn spawn_recruit_menu(
 
 fn spawn_unit_card(
     parent: &mut ChildSpawnerCommands,
-    wood_icon: &Handle<Image>,
+    meat_icon: &Handle<Image>,
     unit: &RecruitableUnit,
     texture: Handle<Image>,
     layout: Handle<TextureAtlasLayout>,
@@ -246,7 +246,7 @@ fn spawn_unit_card(
                 BorderRadius::all(Val::Px(4.0)),
                 RecruitOption {
                     unit_id: unit.id.to_string(),
-                    wood_cost: unit.wood_cost,
+                    meat_cost: unit.meat_cost,
                 },
                 Button,
             ))
@@ -270,16 +270,16 @@ fn spawn_unit_card(
                     })
                     .with_children(|cost_row: &mut ChildSpawnerCommands| {
                         cost_row.spawn((
-                            Text::new(format!("{}", unit.wood_cost)),
+                            Text::new(format!("{}", unit.meat_cost)),
                             TextFont {
                                 font_size: 11.0,
                                 ..default()
                             },
-                            TextColor(Color::srgb(0.9, 0.7, 0.4)),
+                            TextColor(Color::srgb(1.0, 0.6, 0.6)),
                         ));
 
                         cost_row.spawn((
-                            ImageNode::new(wood_icon.clone()),
+                            ImageNode::new(meat_icon.clone()),
                             Node {
                                 width: Val::Px(16.0),
                                 height: Val::Px(16.0),
@@ -324,11 +324,11 @@ pub fn handle_recruit_selection(
 ) {
     for (interaction, option) in interaction_query.iter_mut() {
         if *interaction == Interaction::Pressed {
-            if game_state.wood >= option.wood_cost {
-                game_state.wood -= option.wood_cost;
+            if game_state.meat >= option.meat_cost {
+                game_state.meat -= option.meat_cost;
                 info!(
-                    "Recruited unit: {} for {} wood",
-                    option.unit_id, option.wood_cost
+                    "Recruited unit: {} for {} meat",
+                    option.unit_id, option.meat_cost
                 );
 
                 // TODO: Actually spawn the recruited unit
@@ -340,8 +340,8 @@ pub fn handle_recruit_selection(
                 menu_state.active = false;
             } else {
                 info!(
-                    "Not enough wood to recruit {}. Need {}, have {}",
-                    option.unit_id, option.wood_cost, game_state.wood
+                    "Not enough meat to recruit {}. Need {}, have {}",
+                    option.unit_id, option.meat_cost, game_state.meat
                 );
             }
         }
