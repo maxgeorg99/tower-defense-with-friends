@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::components::{AnimationTimer, Enemy, HealthBar, HealthBarFill};
+use crate::components::{AnimationTimer, DefenseType, Enemy, HealthBar, HealthBarFill};
 use crate::constants::{SCALED_TILE_SIZE, WARRIOR_FRAME_SIZE};
 use crate::resources::{EnemySpawner, GameState, PathWaypoints, WaveConfigs};
 use crate::systems::WaveManager;
@@ -90,6 +90,7 @@ pub fn spawn_enemies(
                             current_waypoint: 0,
                             gold_reward: unit_type.gold_reward,
                             damage_to_base: unit_type.damage_to_base,
+                            defense_type: DefenseType::from_str(&unit_type.defense_type),
                         },
                         AnimationTimer {
                             timer: Timer::from_seconds(0.1, TimerMode::Repeating),

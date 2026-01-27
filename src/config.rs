@@ -14,6 +14,12 @@ pub struct UnitType {
     pub gold_reward: i32,
     pub frame_count: usize,
     pub frame_size: [u32; 2],
+    #[serde(default = "default_defense_type")]
+    pub defense_type: String,
+}
+
+fn default_defense_type() -> String {
+    "armor".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +34,12 @@ pub struct TowerType {
     pub projectile_sprite: String,
     pub projectile_speed: f32,
     pub description: String,
+    #[serde(default = "default_attack_type")]
+    pub attack_type: String,
+}
+
+fn default_attack_type() -> String {
+    "pierce".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

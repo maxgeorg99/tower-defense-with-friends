@@ -15,6 +15,9 @@ pub struct GoldText;
 #[derive(Component)]
 pub struct WoodText;
 
+#[derive(Component)]
+pub struct EffectivenessHint;
+
 // Setup top bar
 pub fn setup_top_bar(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
@@ -104,4 +107,143 @@ pub fn update_top_bar(
     for mut text in wood_query.iter_mut() {
         text.0 = game_state.wood.to_string();
     }
+}
+
+/// Setup the effectiveness matrix hint in the bottom left
+pub fn setup_effectiveness_hint(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let icon_size = 20.0;
+    let cell_size = 28.0;
+    let font_size = 11.0;
+
+    // Colors for effectiveness values
+    let strong_color = Color::srgb(0.3, 1.0, 0.3);   // Green for bonus
+    let weak_color = Color::srgb(1.0, 0.4, 0.4);     // Red for penalty
+    let neutral_color = Color::srgb(0.8, 0.8, 0.8); // Gray for neutral
+
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: Val::Px(10.0),
+                left: Val::Px(10.0),
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(8.0)),
+                row_gap: Val::Px(2.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+            BorderRadius::all(Val::Px(6.0)),
+            EffectivenessHint,
+            GameUI,
+        ))
+        .with_children(|parent| {
+            // Header row with defense type icons
+            parent
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(5.0),
+                    align_items: AlignItems::Center,
+                    ..default()
+                })
+                .with_children(|row| {
+                    // Empty corner cell
+                    row.spawn(Node {
+                        width: Val::Px(cell_size),
+                        height: Val::Px(icon_size),
+                        ..default()
+                    });
+                    // Defense icons: Armor, Agility, Mystical
+                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Defense_Icon.png", icon_size);
+                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Agility_Icon.png", icon_size);
+                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Mystical_Icon.png", icon_size);
+                });
+
+            // Blunt row
+            parent
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(2.0),
+                    align_items: AlignItems::Center,
+                    ..default()
+                })
+                .with_children(|row| {
+                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Blunt_Icon.png", icon_size);
+                    spawn_value_cell(row, "+25", strong_color, cell_size, font_size);
+                    spawn_value_cell(row, "-15", weak_color, cell_size, font_size);
+                    spawn_value_cell(row, "+10", strong_color, cell_size, font_size);
+                });
+
+            // Pierce row
+            parent
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(2.0),
+                    align_items: AlignItems::Center,
+                    ..default()
+                })
+                .with_children(|row| {
+                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Pierce_Icon.png", icon_size);
+                    spawn_value_cell(row, "-20", weak_color, cell_size, font_size);
+                    spawn_value_cell(row, "+25", strong_color, cell_size, font_size);
+                    spawn_value_cell(row, "-10", weak_color, cell_size, font_size);
+                });
+
+            // Divine row
+            parent
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(2.0),
+                    align_items: AlignItems::Center,
+                    ..default()
+                })
+                .with_children(|row| {
+                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Divine_Icon.png", icon_size);
+                    spawn_value_cell(row, "0", neutral_color, cell_size, font_size);
+                    spawn_value_cell(row, "-10", weak_color, cell_size, font_size);
+                    spawn_value_cell(row, "+30", strong_color, cell_size, font_size);
+                });
+        });
+}
+
+fn spawn_icon(
+    parent: &mut RelatedSpawnerCommands<ChildOf>,
+    asset_server: &AssetServer,
+    path: impl Into<String>,
+    size: f32,
+) {
+    let path_string: String = path.into();
+    parent.spawn((
+        Node {
+            width: Val::Px(size),
+            height: Val::Px(size),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        },
+        ImageNode::new(asset_server.load(path_string)),
+    ));
+}
+
+fn spawn_value_cell(
+    parent: &mut RelatedSpawnerCommands<ChildOf>,
+    value: &str,
+    color: Color,
+    width: f32,
+    font_size: f32,
+) {
+    parent
+        .spawn(Node {
+            width: Val::Px(width),
+            height: Val::Px(width),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        })
+        .with_children(|cell| {
+            cell.spawn((
+                Text(value.to_string()),
+                TextFont { font_size, ..default() },
+                TextColor(color),
+            ));
+        });
 }

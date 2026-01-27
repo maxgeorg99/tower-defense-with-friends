@@ -1,15 +1,16 @@
 use bevy::prelude::*;
+use bevy::ecs::prelude::ChildSpawnerCommands;
 use bevy_spacetimedb::*;
 use spacetimedb_sdk::Table;
 
 use crate::components::{
-    AnimationTimer, Depleted, HarvestTimer, ResourceNode, ResourceType, Worker, WorkerBuilding,
-    WorkerState, WorkerTarget,
+    AnimationTimer, BuildWorkerOption, Depleted, HarvestTimer, HouseMenu, ResourceNode,
+    ResourceType, Worker, WorkerBuilding, WorkerState, WorkerTarget,
 };
 use crate::constants::SCALED_TILE_SIZE;
 use crate::map::tile_to_world;
 use crate::module_bindings::{Color as PlayerColor, DbConnection, UserTableAccess};
-use crate::resources::GameState;
+use crate::resources::{GameState, HouseMenuState, RecruitMenuState, TowerUpgradeMenuState, TowerWheelState};
 use crate::systems::AnimationInfo;
 
 /// Type alias for cleaner SpacetimeDB resource access
@@ -144,9 +145,6 @@ pub fn spawn_workers(
             ));
 
             building.spawned_workers += 1;
-            info!(
-                building.spawned_workers, building.max_workers
-            );
         }
     }
 }
@@ -340,6 +338,235 @@ pub fn animate_worker_sprites(
         if timer.timer.just_finished() {
             if let Some(atlas) = &mut sprite.texture_atlas {
                 atlas.index = (atlas.index + 1) % info.frame_count;
+            }
+        }
+    }
+}
+
+// ==================== House Menu Systems ====================
+
+const WORKER_GOLD_COST: i32 = 50;
+
+/// Show house menu when clicking on the worker building
+pub fn show_house_menu(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mouse_button: Res<ButtonInput<MouseButton>>,
+    windows: Query<&Window>,
+    camera: Query<(&Camera, &GlobalTransform)>,
+    mut house_menu_state: ResMut<HouseMenuState>,
+    recruit_menu_state: Res<RecruitMenuState>,
+    tower_wheel_state: Res<TowerWheelState>,
+    upgrade_menu_state: Res<TowerUpgradeMenuState>,
+    buildings: Query<&Transform, With<WorkerBuilding>>,
+    existing_menus: Query<Entity, With<HouseMenu>>,
+    stdb: Option<SpacetimeDB>,
+) {
+    if !mouse_button.just_pressed(MouseButton::Left)
+        || house_menu_state.active
+        || recruit_menu_state.active
+        || tower_wheel_state.active
+        || upgrade_menu_state.active
+    {
+        return;
+    }
+
+    let Ok(window) = windows.single() else { return };
+    let Ok((camera, camera_transform)) = camera.single() else { return };
+    let Some(cursor_pos) = window.cursor_position() else { return };
+    let Ok(world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_pos) else { return };
+
+    for building_transform in buildings.iter() {
+        let building_pos = building_transform.translation.truncate();
+        if world_pos.distance(building_pos) < SCALED_TILE_SIZE / 2.0 {
+            for entity in existing_menus.iter() {
+                commands.entity(entity).despawn();
+            }
+            house_menu_state.active = true;
+            let player_color = get_player_color(&stdb);
+            spawn_house_menu(&mut commands, &asset_server, player_color);
+            return;
+        }
+    }
+}
+
+fn spawn_house_menu(commands: &mut Commands, asset_server: &Res<AssetServer>, player_color: PlayerColor) {
+    let gold_icon = asset_server.load("UI Elements/UI Elements/Icons/Gold_Icon.png");
+    let color_dir = get_color_dir(player_color);
+    let pawn_icon: Handle<Image> = asset_server.load(format!("Units/{} Units/Pawn/Pawn_Avatar.png", color_dir));
+
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            HouseMenu,
+        ))
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::all(Val::Px(20.0)),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        row_gap: Val::Px(15.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.1, 0.15, 0.2, 0.95)),
+                    BorderRadius::all(Val::Px(10.0)),
+                ))
+                .with_children(|panel| {
+                    panel.spawn((
+                        Text::new("Worker House"),
+                        TextFont { font_size: 24.0, ..default() },
+                        TextColor(Color::WHITE),
+                    ));
+
+                    panel
+                        .spawn((
+                            Node {
+                                flex_direction: FlexDirection::Column,
+                                align_items: AlignItems::Center,
+                                padding: UiRect::all(Val::Px(15.0)),
+                                row_gap: Val::Px(8.0),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.2, 0.35, 0.45, 0.9)),
+                            BorderRadius::all(Val::Px(8.0)),
+                        ))
+                        .with_children(|card: &mut ChildSpawnerCommands| {
+                            // Pawn sprite preview (first frame of the sprite sheet)
+                            card.spawn((
+                                ImageNode::new(pawn_icon.clone()),
+                                Node {
+                                    width: Val::Px(64.0),
+                                    height: Val::Px(64.0),
+                                    ..default()
+                                },
+                            ));
+
+                            card.spawn((
+                                Text::new("WORKER"),
+                                TextFont { font_size: 14.0, ..default() },
+                                TextColor(Color::WHITE),
+                            ));
+
+                            card.spawn((
+                                Node {
+                                    flex_direction: FlexDirection::Column,
+                                    align_items: AlignItems::Center,
+                                    padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgba(0.15, 0.4, 0.3, 1.0)),
+                                BorderRadius::all(Val::Px(4.0)),
+                                BuildWorkerOption { gold_cost: WORKER_GOLD_COST },
+                                Button,
+                            ))
+                            .with_children(|button: &mut ChildSpawnerCommands| {
+                                button.spawn((
+                                    Text::new("Build"),
+                                    TextFont { font_size: 12.0, ..default() },
+                                    TextColor(Color::WHITE),
+                                ));
+
+                                button
+                                    .spawn(Node {
+                                        flex_direction: FlexDirection::Row,
+                                        align_items: AlignItems::Center,
+                                        column_gap: Val::Px(4.0),
+                                        ..default()
+                                    })
+                                    .with_children(|cost_row: &mut ChildSpawnerCommands| {
+                                        cost_row.spawn((
+                                            Text::new(format!("{}", WORKER_GOLD_COST)),
+                                            TextFont { font_size: 11.0, ..default() },
+                                            TextColor(Color::srgb(1.0, 0.85, 0.0)),
+                                        ));
+                                        cost_row.spawn((
+                                            ImageNode::new(gold_icon.clone()),
+                                            Node { width: Val::Px(16.0), height: Val::Px(16.0), ..default() },
+                                        ));
+                                    });
+                            });
+                        });
+
+                    panel.spawn((
+                        Text::new("Right-click or ESC to close"),
+                        TextFont { font_size: 12.0, ..default() },
+                        TextColor(Color::srgba(0.7, 0.7, 0.7, 1.0)),
+                    ));
+                });
+        });
+}
+
+pub fn hide_house_menu(
+    mut commands: Commands,
+    mouse_button: Res<ButtonInput<MouseButton>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut menu_state: ResMut<HouseMenuState>,
+    menu_entities: Query<Entity, With<HouseMenu>>,
+) {
+    if !menu_state.active {
+        return;
+    }
+    if mouse_button.just_pressed(MouseButton::Right) || keyboard.just_pressed(KeyCode::Escape) {
+        for entity in menu_entities.iter() {
+            commands.entity(entity).despawn();
+        }
+        menu_state.active = false;
+    }
+}
+
+pub fn handle_build_worker(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut interaction_query: Query<(&Interaction, &BuildWorkerOption), (Changed<Interaction>, With<Button>)>,
+    mut game_state: ResMut<GameState>,
+    mut menu_state: ResMut<HouseMenuState>,
+    menu_entities: Query<Entity, With<HouseMenu>>,
+    mut buildings: Query<(Entity, &mut WorkerBuilding, &Transform)>,
+    stdb: Option<SpacetimeDB>,
+) {
+    for (interaction, option) in interaction_query.iter_mut() {
+        if *interaction == Interaction::Pressed {
+            if game_state.gold >= option.gold_cost {
+                game_state.gold -= option.gold_cost;
+
+                if let Some((building_entity, mut building, building_transform)) = buildings.iter_mut().next() {
+                    let spawn_pos = building_transform.translation.truncate();
+                    let color = get_player_color(&stdb);
+                    let color_dir = get_color_dir(color);
+
+                    let texture_path = format!("Units/{} Units/Pawn/Pawn_Idle.png", color_dir);
+                    let texture = asset_server.load(&texture_path);
+                    let layout = TextureAtlasLayout::from_grid(PAWN_FRAME_SIZE, 6, 1, None, None);
+                    let texture_atlas_layout = asset_server.add(layout);
+                    let pawn_scale = SCALED_TILE_SIZE / PAWN_FRAME_SIZE.x as f32;
+
+                    commands.spawn((
+                        Sprite::from_atlas_image(texture, TextureAtlas { layout: texture_atlas_layout, index: 0 }),
+                        Transform::from_xyz(spawn_pos.x, spawn_pos.y, 2.0).with_scale(Vec3::splat(pawn_scale)),
+                        Worker { speed: WORKER_SPEED, home_building: building_entity },
+                        WorkerState::Idle,
+                        AnimationTimer { timer: Timer::from_seconds(0.15, TimerMode::Repeating) },
+                        AnimationInfo { frame_count: 6 },
+                    ));
+
+                    building.spawned_workers += 1;
+                    building.max_workers += 1;
+                    info!("Worker built for {} gold! Total: {}", option.gold_cost, building.spawned_workers);
+                }
+
+                for entity in menu_entities.iter() {
+                    commands.entity(entity).despawn();
+                }
+                menu_state.active = false;
             }
         }
     }

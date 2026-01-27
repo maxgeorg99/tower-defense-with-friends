@@ -1,5 +1,70 @@
 use bevy::prelude::*;
 
+// ==================== Combat Type System ====================
+
+/// Attack types for towers/projectiles
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum AttackType {
+    #[default]
+    Blunt,   // Hammers, catapults, rocks
+    Pierce,  // Arrows, spears, bolts
+    Divine,  // Holy/magical damage
+}
+
+/// Defense types for enemies
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum DefenseType {
+    #[default]
+    Armor,    // Heavy armor - weak to blunt, strong vs pierce
+    Agility,  // Dodgy/fast - weak to pierce, strong vs blunt
+    Mystical, // Magical creatures - weak to divine
+}
+
+impl AttackType {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "blunt" => AttackType::Blunt,
+            "pierce" => AttackType::Pierce,
+            "divine" => AttackType::Divine,
+            _ => AttackType::Blunt,
+        }
+    }
+}
+
+impl DefenseType {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "armor" => DefenseType::Armor,
+            "agility" => DefenseType::Agility,
+            "mystical" => DefenseType::Mystical,
+            _ => DefenseType::Armor,
+        }
+    }
+}
+
+/// Calculate damage multiplier based on attack vs defense type
+/// Returns a multiplier (e.g., 1.25 for +25%, 0.85 for -15%)
+pub fn get_damage_multiplier(attack: AttackType, defense: DefenseType) -> f32 {
+    match (attack, defense) {
+        // Blunt attacks
+        (AttackType::Blunt, DefenseType::Armor) => 1.25,    // +25%
+        (AttackType::Blunt, DefenseType::Agility) => 0.85,  // -15%
+        (AttackType::Blunt, DefenseType::Mystical) => 1.10, // +10%
+
+        // Pierce attacks
+        (AttackType::Pierce, DefenseType::Armor) => 0.80,   // -20%
+        (AttackType::Pierce, DefenseType::Agility) => 1.25, // +25%
+        (AttackType::Pierce, DefenseType::Mystical) => 0.90, // -10%
+
+        // Divine attacks
+        (AttackType::Divine, DefenseType::Armor) => 1.00,   // 0%
+        (AttackType::Divine, DefenseType::Agility) => 0.90, // -10%
+        (AttackType::Divine, DefenseType::Mystical) => 1.30, // +30%
+    }
+}
+
+// ==================== Core Components ====================
+
 #[derive(Component)]
 pub struct Enemy {
     pub health: f32,
@@ -7,6 +72,7 @@ pub struct Enemy {
     pub current_waypoint: usize,
     pub gold_reward: i32,
     pub damage_to_base: i32,
+    pub defense_type: DefenseType,
 }
 
 #[derive(Component)]
@@ -23,6 +89,7 @@ pub struct Tower {
     pub cooldown: f32,
     pub projectile_sprite: String,
     pub projectile_speed: f32,
+    pub attack_type: AttackType,
 }
 
 #[derive(Component)]
@@ -30,6 +97,7 @@ pub struct Projectile {
     pub damage: f32,
     pub speed: f32,
     pub target: Entity,
+    pub attack_type: AttackType,
 }
 
 #[derive(Component)]
@@ -126,4 +194,37 @@ pub struct RecruitMenu;
 pub struct RecruitOption {
     pub unit_id: String,
     pub wood_cost: i32,
+}
+
+// House menu components
+#[derive(Component)]
+pub struct HouseMenu;
+
+#[derive(Component)]
+pub struct BuildWorkerOption {
+    pub gold_cost: i32,
+}
+
+// Tower upgrade menu components
+#[derive(Component)]
+pub struct TowerUpgradeMenu;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum UpgradeType {
+    Damage,
+    Range,
+    FireRate,
+}
+
+#[derive(Component)]
+pub struct TowerUpgradeOption {
+    pub upgrade_type: UpgradeType,
+    pub wood_cost: i32,
+}
+
+#[derive(Component, Default)]
+pub struct TowerLevel {
+    pub damage_level: i32,
+    pub range_level: i32,
+    pub fire_rate_level: i32,
 }

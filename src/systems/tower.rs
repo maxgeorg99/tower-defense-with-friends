@@ -1,13 +1,14 @@
 use bevy::prelude::*;
+use bevy::ecs::prelude::ChildSpawnerCommands;
 use bevy_spacetimedb::StdbConnection;
 use spacetimedb_sdk::Table;
-use crate::components::{Enemy, Tower, TowerWheelMenu, TowerWheelOption, Projectile};
+use crate::components::{AttackType, Enemy, Tower, TowerLevel, TowerUpgradeMenu, TowerUpgradeOption, TowerWheelMenu, TowerWheelOption, Projectile, UpgradeType, WorkerBuilding};
 use crate::config::TowerType;
 use crate::constants::{ARROW_SIZE, EXPLORE_COST, EXPLORE_RADIUS, SCALED_TILE_SIZE, TOWER_SIZE};
 use crate::map::world_to_tile;
 use crate::module_bindings;
 use crate::module_bindings::{DbConnection, MyUserTableAccess, UserTableAccess};
-use crate::resources::{BlockedTiles, FogOfWar, GameState, RecruitMenuState, TowerConfigs, TowerWheelState};
+use crate::resources::{BlockedTiles, FogOfWar, GameState, HouseMenuState, RecruitMenuState, TowerConfigs, TowerUpgradeMenuState, TowerWheelState};
 
 //TODO Display for generated Types?!
 impl module_bindings::Color {
@@ -47,7 +48,9 @@ pub fn spawn_tower(
             cooldown: 0.0,
             projectile_sprite: tower_type.projectile_sprite.clone(),
             projectile_speed: tower_type.projectile_speed,
+            attack_type: AttackType::from_str(&tower_type.attack_type),
         },
+        TowerLevel::default(),
     ));
 }
 
@@ -61,12 +64,21 @@ pub fn show_tower_wheel_menu(
     tower_configs: Res<TowerConfigs>,
     fog: Res<FogOfWar>,
     recruit_menu_state: Res<RecruitMenuState>,
+    house_menu_state: Res<HouseMenuState>,
+    upgrade_menu_state: Res<TowerUpgradeMenuState>,
     blocked_tiles: Res<BlockedTiles>,
     existing_menus: Query<Entity, With<TowerWheelMenu>>,
+    existing_towers: Query<&Transform, With<Tower>>,
+    worker_buildings: Query<&Transform, With<WorkerBuilding>>,
     stdb: Option<SpacetimeDB>,
 ) {
-    // Don't show if recruit menu is active
-    if mouse_button.just_pressed(MouseButton::Left) && !wheel_state.active && !recruit_menu_state.active {
+    // Don't show if any menu is active
+    if mouse_button.just_pressed(MouseButton::Left)
+        && !wheel_state.active
+        && !recruit_menu_state.active
+        && !house_menu_state.active
+        && !upgrade_menu_state.active
+    {
         let Ok(window) = windows.single() else { return };
         let Ok((camera, camera_transform)) = camera.single() else {
             return;
@@ -84,6 +96,22 @@ pub fn show_tower_wheel_menu(
                 // Don't show tower wheel on road tiles
                 if blocked_tiles.is_road(tile_x, tile_y) {
                     return;
+                }
+
+                // Don't show tower wheel if clicking on existing tower (upgrade menu handles that)
+                for tower_transform in existing_towers.iter() {
+                    let tower_pos = tower_transform.translation.truncate();
+                    if world_pos.distance(tower_pos) < SCALED_TILE_SIZE / 2.0 {
+                        return;
+                    }
+                }
+
+                // Don't show tower wheel if clicking on worker building (house menu handles that)
+                for building_transform in worker_buildings.iter() {
+                    let building_pos = building_transform.translation.truncate();
+                    if world_pos.distance(building_pos) < SCALED_TILE_SIZE / 2.0 {
+                        return;
+                    }
                 }
 
                 // Clean up any existing menus
@@ -384,6 +412,7 @@ pub fn tower_shooting(
                         damage: tower.damage,
                         speed: tower.projectile_speed,
                         target: target_entity,
+                        attack_type: tower.attack_type,
                     },
                 ));
 
@@ -402,4 +431,365 @@ fn get_user_color(stdb: Option<&SpacetimeDB>) -> module_bindings::Color {
 fn get_tower_sprite_path(tower_type: &TowerType, stdb: Option<&SpacetimeDB>) -> String {
     let color = get_user_color(stdb);
     tower_type.sprite_path.replace("Blue", color.as_str())
+}
+
+// ==================== Tower Upgrade Menu Systems ====================
+
+const UPGRADE_DAMAGE_COST: i32 = 30;
+const UPGRADE_RANGE_COST: i32 = 25;
+const UPGRADE_FIRE_RATE_COST: i32 = 35;
+
+/// Show upgrade menu when clicking on an existing tower
+pub fn show_tower_upgrade_menu(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mouse_button: Res<ButtonInput<MouseButton>>,
+    windows: Query<&Window>,
+    camera: Query<(&Camera, &GlobalTransform)>,
+    mut upgrade_menu_state: ResMut<TowerUpgradeMenuState>,
+    wheel_state: Res<TowerWheelState>,
+    recruit_menu_state: Res<RecruitMenuState>,
+    house_menu_state: Res<HouseMenuState>,
+    towers: Query<(Entity, &Transform, &Tower, &TowerLevel)>,
+    existing_menus: Query<Entity, With<TowerUpgradeMenu>>,
+) {
+    // Don't show if any other menu is active
+    if !mouse_button.just_pressed(MouseButton::Left)
+        || upgrade_menu_state.active
+        || wheel_state.active
+        || recruit_menu_state.active
+        || house_menu_state.active
+    {
+        return;
+    }
+
+    let Ok(window) = windows.single() else { return };
+    let Ok((camera, camera_transform)) = camera.single() else { return };
+    let Some(cursor_pos) = window.cursor_position() else { return };
+    let Ok(world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_pos) else { return };
+
+    // Check if clicked on a tower
+    for (tower_entity, tower_transform, tower, tower_level) in towers.iter() {
+        let tower_pos = tower_transform.translation.truncate();
+        if world_pos.distance(tower_pos) < SCALED_TILE_SIZE / 2.0 {
+            // Clean up existing menus
+            for entity in existing_menus.iter() {
+                commands.entity(entity).despawn();
+            }
+
+            upgrade_menu_state.active = true;
+            upgrade_menu_state.selected_tower = Some(tower_entity);
+            spawn_tower_upgrade_menu(&mut commands, &asset_server, tower, tower_level);
+            return;
+        }
+    }
+}
+
+fn spawn_tower_upgrade_menu(
+    commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
+    tower: &Tower,
+    tower_level: &TowerLevel,
+) {
+    let wood_icon = asset_server.load("Terrain/Resources/Wood/Wood Resource/Wood Resource.png");
+
+    // Main menu container (centered overlay)
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            TowerUpgradeMenu,
+        ))
+        .with_children(|parent| {
+            // Menu background panel
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::all(Val::Px(20.0)),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        row_gap: Val::Px(15.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.1, 0.15, 0.2, 0.95)),
+                    BorderRadius::all(Val::Px(10.0)),
+                ))
+                .with_children(|panel| {
+                    // Title
+                    panel.spawn((
+                        Text::new(format!("Upgrade {}", tower.tower_type_id.to_uppercase())),
+                        TextFont {
+                            font_size: 24.0,
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                    ));
+
+                    // Current stats display
+                    panel.spawn((
+                        Text::new(format!(
+                            "DMG: {:.0}  RNG: {:.0}  SPD: {:.1}s",
+                            tower.damage, tower.range, tower.fire_rate
+                        )),
+                        TextFont {
+                            font_size: 12.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.8, 0.8, 0.8, 1.0)),
+                    ));
+
+                    // Upgrade options container
+                    panel
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            column_gap: Val::Px(15.0),
+                            ..default()
+                        })
+                        .with_children(|cards_row| {
+                            // Damage upgrade
+                            spawn_upgrade_card(
+                                cards_row,
+                                &wood_icon,
+                                "DAMAGE",
+                                "+25%",
+                                format!("Lv.{}", tower_level.damage_level),
+                                UpgradeType::Damage,
+                                UPGRADE_DAMAGE_COST,
+                            );
+
+                            // Range upgrade
+                            spawn_upgrade_card(
+                                cards_row,
+                                &wood_icon,
+                                "RANGE",
+                                "+20%",
+                                format!("Lv.{}", tower_level.range_level),
+                                UpgradeType::Range,
+                                UPGRADE_RANGE_COST,
+                            );
+
+                            // Fire Rate upgrade
+                            spawn_upgrade_card(
+                                cards_row,
+                                &wood_icon,
+                                "SPEED",
+                                "-20%",
+                                format!("Lv.{}", tower_level.fire_rate_level),
+                                UpgradeType::FireRate,
+                                UPGRADE_FIRE_RATE_COST,
+                            );
+                        });
+
+                    // Close hint
+                    panel.spawn((
+                        Text::new("Right-click or ESC to close"),
+                        TextFont {
+                            font_size: 12.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.7, 0.7, 0.7, 1.0)),
+                    ));
+                });
+        });
+}
+
+fn spawn_upgrade_card(
+    parent: &mut ChildSpawnerCommands,
+    wood_icon: &Handle<Image>,
+    name: &str,
+    bonus: &str,
+    level: String,
+    upgrade_type: UpgradeType,
+    cost: i32,
+) {
+    parent
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                padding: UiRect::all(Val::Px(10.0)),
+                row_gap: Val::Px(6.0),
+                width: Val::Px(90.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.2, 0.35, 0.45, 0.9)),
+            BorderRadius::all(Val::Px(8.0)),
+        ))
+        .with_children(|card: &mut ChildSpawnerCommands| {
+            // Upgrade name
+            card.spawn((
+                Text::new(name),
+                TextFont {
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+
+            // Bonus text
+            card.spawn((
+                Text::new(bonus),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.4, 1.0, 0.4)),
+            ));
+
+            // Current level
+            card.spawn((
+                Text::new(level),
+                TextFont {
+                    font_size: 11.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(0.7, 0.7, 0.7, 1.0)),
+            ));
+
+            // Upgrade button
+            card.spawn((
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    padding: UiRect::axes(Val::Px(10.0), Val::Px(5.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.15, 0.4, 0.3, 1.0)),
+                BorderRadius::all(Val::Px(4.0)),
+                TowerUpgradeOption {
+                    upgrade_type,
+                    wood_cost: cost,
+                },
+                Button,
+            ))
+            .with_children(|button: &mut ChildSpawnerCommands| {
+                button.spawn((
+                    Text::new("Upgrade"),
+                    TextFont {
+                        font_size: 11.0,
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                ));
+
+                // Cost row with icon
+                button
+                    .spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(4.0),
+                        ..default()
+                    })
+                    .with_children(|cost_row: &mut ChildSpawnerCommands| {
+                        cost_row.spawn((
+                            Text::new(format!("{}", cost)),
+                            TextFont {
+                                font_size: 10.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgb(0.9, 0.7, 0.4)),
+                        ));
+
+                        cost_row.spawn((
+                            ImageNode::new(wood_icon.clone()),
+                            Node {
+                                width: Val::Px(14.0),
+                                height: Val::Px(14.0),
+                                ..default()
+                            },
+                        ));
+                    });
+            });
+        });
+}
+
+/// Hide upgrade menu on right-click or escape
+pub fn hide_tower_upgrade_menu(
+    mut commands: Commands,
+    mouse_button: Res<ButtonInput<MouseButton>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut menu_state: ResMut<TowerUpgradeMenuState>,
+    menu_entities: Query<Entity, With<TowerUpgradeMenu>>,
+) {
+    if !menu_state.active {
+        return;
+    }
+
+    if mouse_button.just_pressed(MouseButton::Right) || keyboard.just_pressed(KeyCode::Escape) {
+        for entity in menu_entities.iter() {
+            commands.entity(entity).despawn();
+        }
+        menu_state.active = false;
+        menu_state.selected_tower = None;
+    }
+}
+
+/// Handle clicking on upgrade buttons
+pub fn handle_tower_upgrade(
+    mut commands: Commands,
+    mut interaction_query: Query<
+        (&Interaction, &TowerUpgradeOption),
+        (Changed<Interaction>, With<Button>),
+    >,
+    mut game_state: ResMut<GameState>,
+    mut menu_state: ResMut<TowerUpgradeMenuState>,
+    menu_entities: Query<Entity, With<TowerUpgradeMenu>>,
+    mut towers: Query<(&mut Tower, &mut TowerLevel)>,
+) {
+    for (interaction, option) in interaction_query.iter_mut() {
+        if *interaction == Interaction::Pressed {
+            if game_state.wood >= option.wood_cost {
+                if let Some(tower_entity) = menu_state.selected_tower {
+                    if let Ok((mut tower, mut tower_level)) = towers.get_mut(tower_entity) {
+                        game_state.wood -= option.wood_cost;
+
+                        match option.upgrade_type {
+                            UpgradeType::Damage => {
+                                tower.damage *= 1.25;
+                                tower_level.damage_level += 1;
+                                info!(
+                                    "Tower damage upgraded to {:.0} (level {})",
+                                    tower.damage, tower_level.damage_level
+                                );
+                            }
+                            UpgradeType::Range => {
+                                tower.range *= 1.20;
+                                tower_level.range_level += 1;
+                                info!(
+                                    "Tower range upgraded to {:.0} (level {})",
+                                    tower.range, tower_level.range_level
+                                );
+                            }
+                            UpgradeType::FireRate => {
+                                tower.fire_rate *= 0.80;
+                                tower_level.fire_rate_level += 1;
+                                info!(
+                                    "Tower fire rate upgraded to {:.2}s (level {})",
+                                    tower.fire_rate, tower_level.fire_rate_level
+                                );
+                            }
+                        }
+
+                        // Close menu after successful upgrade
+                        for entity in menu_entities.iter() {
+                            commands.entity(entity).despawn();
+                        }
+                        menu_state.active = false;
+                        menu_state.selected_tower = None;
+                    }
+                }
+            } else {
+                info!(
+                    "Not enough wood to upgrade. Need {}, have {}",
+                    option.wood_cost, game_state.wood
+                );
+            }
+        }
+    }
 }

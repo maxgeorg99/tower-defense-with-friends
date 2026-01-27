@@ -96,6 +96,7 @@ enum UnitField {
     BaseSpeed,
     DamageToBase,
     GoldReward,
+    DefenseType,
     FrameCount,
     FrameSize,
 }
@@ -111,6 +112,7 @@ impl UnitField {
             UnitField::BaseSpeed,
             UnitField::DamageToBase,
             UnitField::GoldReward,
+            UnitField::DefenseType,
             UnitField::FrameCount,
             UnitField::FrameSize,
         ]
@@ -587,6 +589,7 @@ impl App {
                 UnitField::BaseSpeed => unit.base_speed.to_string(),
                 UnitField::DamageToBase => unit.damage_to_base.to_string(),
                 UnitField::GoldReward => unit.gold_reward.to_string(),
+                UnitField::DefenseType => unit.defense_type.clone(),
                 UnitField::FrameCount => unit.frame_count.to_string(),
                 UnitField::FrameSize => format!("{}x{}", unit.frame_size[0], unit.frame_size[1]),
             };
@@ -663,6 +666,16 @@ impl App {
                         Err("Invalid number".to_string())
                     }
                 }
+                UnitField::DefenseType => {
+                    let valid_types = ["armor", "agility", "mystical"];
+                    let input = self.edit_buffer.to_lowercase();
+                    if valid_types.contains(&input.as_str()) {
+                        self.units[unit_idx].defense_type = input;
+                        Ok("Defense type updated".to_string())
+                    } else {
+                        Err("Invalid defense type (use: armor, agility, mystical)".to_string())
+                    }
+                }
                 UnitField::FrameCount => {
                     if let Ok(value) = self.edit_buffer.parse::<usize>() {
                         self.units[unit_idx].frame_count = value;
@@ -715,6 +728,7 @@ impl App {
             gold_reward: 10,
             frame_count: 6,
             frame_size: [192, 192],
+            defense_type: "armor".to_string(),
         };
         self.units.push(new_unit.clone());
         self.unit_list_state.select(Some(self.units.len() - 1));
@@ -1111,6 +1125,7 @@ fn render_units_list(f: &mut Frame, app: &mut App, area: Rect) {
             make_field_line(UnitField::BaseSpeed, "Speed: ".to_string(), format!("{:.0}", unit.base_speed), Color::Cyan),
             make_field_line(UnitField::DamageToBase, "Damage: ".to_string(), unit.damage_to_base.to_string(), Color::Magenta),
             make_field_line(UnitField::GoldReward, "Gold: ".to_string(), unit.gold_reward.to_string(), Color::Yellow),
+            make_field_line(UnitField::DefenseType, "Defense: ".to_string(), unit.defense_type.clone(), Color::LightBlue),
             Line::from(""),
             make_field_line(UnitField::FrameCount, "Frames: ".to_string(), unit.frame_count.to_string(), Color::Blue),
             make_field_line(UnitField::FrameSize, "Size: ".to_string(), format!("{}x{}", unit.frame_size[0], unit.frame_size[1]), Color::Blue),

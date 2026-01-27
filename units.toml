@@ -12,6 +12,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "armor"
 
 [[units]]
 id = "archer"
@@ -27,6 +28,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "agility"
 
 [[units]]
 id = "lancer"
@@ -42,6 +44,7 @@ frame_size = [
     320,
     320,
 ]
+defense_type = "armor"
 
 [[units]]
 id = "monk"
@@ -57,6 +60,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "mystical"
 
 [[units]]
 id = "skull"
@@ -72,6 +76,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "mystical"
 
 [[units]]
 id = "paddle_fish"
@@ -87,6 +92,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "agility"
 
 [[units]]
 id = "harpoon_fish"
@@ -102,6 +108,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "agility"
 
 [[units]]
 id = "goblin_lancer"
@@ -117,6 +124,7 @@ frame_size = [
     256,
     256,
 ]
+defense_type = "armor"
 
 [[units]]
 id = "shaman"
@@ -132,6 +140,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "mystical"
 
 [[units]]
 id = "thief"
@@ -147,6 +156,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "agility"
 
 [[units]]
 id = "snake"
@@ -162,6 +172,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "agility"
 
 [[units]]
 id = "turtle"
@@ -177,6 +188,7 @@ frame_size = [
     320,
     320,
 ]
+defense_type = "armor"
 
 [[units]]
 id = "minotaur"
@@ -192,6 +204,7 @@ frame_size = [
     320,
     320,
 ]
+defense_type = "armor"
 
 [[units]]
 id = "gnoll"
@@ -207,6 +220,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "armor"
 
 [[units]]
 id = "spider"
@@ -222,6 +236,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "agility"
 
 [[units]]
 id = "panda"
@@ -237,6 +252,7 @@ frame_size = [
     256,
     256,
 ]
+defense_type = "armor"
 
 [[units]]
 id = "lizard"
@@ -252,6 +268,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "armor"
 
 [[units]]
 id = "bear"
@@ -267,6 +284,7 @@ frame_size = [
     256,
     256,
 ]
+defense_type = "armor"
 
 [[units]]
 id = "gnome"
@@ -282,6 +300,7 @@ frame_size = [
     192,
     192,
 ]
+defense_type = "agility"
 
 [[units]]
 id = "ogre"
@@ -297,3 +316,4 @@ frame_size = [
     384,
     384,
 ]
+defense_type = "armor"

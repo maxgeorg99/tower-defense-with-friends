@@ -133,6 +133,17 @@ pub struct RecruitMenuState {
     pub active: bool,
 }
 
+#[derive(Resource, Default)]
+pub struct HouseMenuState {
+    pub active: bool,
+}
+
+#[derive(Resource, Default)]
+pub struct TowerUpgradeMenuState {
+    pub active: bool,
+    pub selected_tower: Option<Entity>,
+}
+
 /// Tracks tiles where building is not allowed (roads, castle, etc.)
 #[derive(Resource)]
 pub struct BlockedTiles {

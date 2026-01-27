@@ -1,7 +1,10 @@
 use bevy::prelude::*;
 
-use crate::components::{Enemy, Projectile};
+use crate::components::{get_damage_multiplier, Enemy, Projectile};
 use crate::resources::GameState;
+
+/// Projectile hit radius - larger value prevents overshooting issues
+const HIT_RADIUS: f32 = 16.0;
 
 pub fn move_projectiles(
     mut commands: Commands,
@@ -12,25 +15,24 @@ pub fn move_projectiles(
     for (projectile_entity, mut projectile_transform, projectile) in projectiles.iter_mut() {
         // Get target position
         if let Ok(enemy_transform) = enemies.get(projectile.target) {
-            let direction =
-                (enemy_transform.translation - projectile_transform.translation).normalize();
-            projectile_transform.translation += direction * projectile.speed * time.delta_secs();
+            let to_target = enemy_transform.translation - projectile_transform.translation;
+            let distance_before = to_target.length();
 
-            // Rotate projectile to face target
-            let angle = direction.y.atan2(direction.x);
-            projectile_transform.rotation = Quat::from_rotation_z(angle);
+            // Calculate movement this frame
+            let move_distance = projectile.speed * time.delta_secs();
 
-            // Check if hit
-            let distance = projectile_transform
-                .translation
-                .distance(enemy_transform.translation);
-            if distance < 10.0 {
-                commands.queue_silenced(move |world: &mut World| {
-                    if let Ok(entity_mut) = world.get_entity_mut(projectile_entity) {
-                        entity_mut.despawn();
-                    }
-                });
+            // If we would overshoot, just move to the target
+            if move_distance >= distance_before {
+                projectile_transform.translation = enemy_transform.translation;
+            } else {
+                let direction = to_target.normalize();
+                projectile_transform.translation += direction * move_distance;
+
+                // Rotate projectile to face target
+                let angle = direction.y.atan2(direction.x);
+                projectile_transform.rotation = Quat::from_rotation_z(angle);
             }
+            // Note: Despawn and damage are handled in handle_projectile_hits
         } else {
             // Target died, remove projectile
             commands.queue_silenced(move |world: &mut World| {
@@ -56,8 +58,13 @@ pub fn handle_projectile_hits(
                 .translation
                 .distance(enemy_transform.translation);
 
-            if distance < 10.0 {
-                enemy.health -= projectile.damage;
+            if distance < HIT_RADIUS {
+                // Calculate damage with type effectiveness multiplier
+                let multiplier = get_damage_multiplier(projectile.attack_type, enemy.defense_type);
+                let final_damage = projectile.damage * multiplier;
+                enemy.health -= final_damage;
+
+                // Despawn projectile
                 commands.queue_silenced(move |world: &mut World| {
                     if let Ok(entity_mut) = world.get_entity_mut(projectile_entity) {
                         entity_mut.despawn();

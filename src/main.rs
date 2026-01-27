@@ -101,6 +101,8 @@ fn main() {
         })
         .insert_resource(FogOfWar::new())
         .init_resource::<RecruitMenuState>()
+        .init_resource::<HouseMenuState>()
+        .init_resource::<TowerUpgradeMenuState>()
         .insert_resource({
             let (blocked, castle) = create_blocked_tiles();
             BlockedTiles { tiles: blocked, castle_tiles: castle }
@@ -110,7 +112,7 @@ fn main() {
         .add_systems(OnEnter(AppState::ColorSelect), connect_to_spacetimedb)
         .add_systems(
             OnEnter(AppState::InGame),
-            (setup_game, setup_fog_of_war, setup_online_users_ui, setup_top_bar, setup_resource_gathering).chain(),
+            (setup_game, setup_fog_of_war, setup_online_users_ui, setup_top_bar, setup_effectiveness_hint, setup_resource_gathering).chain(),
         )
         .add_systems(
             Update,
@@ -141,6 +143,9 @@ fn main() {
                 show_recruit_menu,
                 hide_recruit_menu,
                 handle_recruit_selection,
+                show_tower_upgrade_menu,
+                hide_tower_upgrade_menu,
+                handle_tower_upgrade,
             )
                 .run_if(in_state(AppState::InGame)),
         )
@@ -162,7 +167,10 @@ fn main() {
                 worker_arrive_check,
                 worker_harvest,
                 worker_sprite_update,
-                animate_worker_sprites
+                animate_worker_sprites,
+                show_house_menu,
+                hide_house_menu,
+                handle_build_worker,
             )
                 .run_if(in_state(AppState::InGame)),
         )

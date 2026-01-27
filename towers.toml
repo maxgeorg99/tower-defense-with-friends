@@ -9,6 +9,7 @@ fire_rate = 0.5
 projectile_sprite = "Units/Blue Units/Archer/Arrow.png"
 projectile_speed = 300.0
 description = "Fast-firing tower that shoots arrows at enemies"
+attack_type = "pierce"
 
 [[towers]]
 id = "catapult"
@@ -21,6 +22,7 @@ fire_rate = 1.5
 projectile_sprite = "Decorations/Rocks/Rock2.png"
 projectile_speed = 200.0
 description = "Slow but powerful tower that hurls rocks at enemies"
+attack_type = "blunt"
 
 [[towers]]
 id = "holy"
@@ -33,6 +35,7 @@ fire_rate = 5.0
 projectile_sprite = "Units/Blue Units/Archer/Arrow.png"
 projectile_speed = 300.0
 description = "A holy tower, very effective vs. demons!"
+attack_type = "divine"
 
 [[towers]]
 id = "tower"
@@ -45,3 +48,4 @@ fire_rate = 0.5
 projectile_sprite = "Units/Blue Units/Archer/Arrow.png"
 projectile_speed = 300.0
 description = "A basic Tower"
+attack_type = "pierce"

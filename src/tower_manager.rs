@@ -39,6 +39,7 @@ enum TowerField {
     Damage,
     FireRate,
     ProjectileSpeed,
+    AttackType,
     Description,
 }
 
@@ -54,6 +55,7 @@ impl TowerField {
             TowerField::Damage,
             TowerField::FireRate,
             TowerField::ProjectileSpeed,
+            TowerField::AttackType,
             TowerField::Description,
         ]
     }
@@ -197,6 +199,7 @@ impl App {
             projectile_sprite: "Units/Blue Units/Archer/Arrow.png".to_string(),
             projectile_speed: 300.0,
             description: "A new tower".to_string(),
+            attack_type: "pierce".to_string(),
         };
         self.towers.push(new_tower.clone());
         self.tower_list_state.select(Some(self.towers.len() - 1));
@@ -243,6 +246,7 @@ impl App {
                 TowerField::Damage => tower.damage.to_string(),
                 TowerField::FireRate => tower.fire_rate.to_string(),
                 TowerField::ProjectileSpeed => tower.projectile_speed.to_string(),
+                TowerField::AttackType => tower.attack_type.clone(),
                 TowerField::Description => tower.description.clone(),
             };
             self.status_message = "Editing (Enter to save, Esc to cancel)".to_string();
@@ -324,6 +328,16 @@ impl App {
                         Ok(format!("Projectile speed set to {}", value))
                     } else {
                         Err("Invalid number".to_string())
+                    }
+                }
+                TowerField::AttackType => {
+                    let valid_types = ["blunt", "pierce", "divine"];
+                    let input = self.edit_buffer.to_lowercase();
+                    if valid_types.contains(&input.as_str()) {
+                        self.towers[tower_idx].attack_type = input;
+                        Ok("Attack type updated".to_string())
+                    } else {
+                        Err("Invalid attack type (use: blunt, pierce, divine)".to_string())
                     }
                 }
                 TowerField::Description => {
@@ -581,6 +595,12 @@ fn render_tower_details(f: &mut Frame, app: &mut App, area: Rect) {
                 "Projectile Speed: ".to_string(),
                 format!("{:.0} px/s", tower.projectile_speed),
                 Color::Blue,
+            ),
+            make_field_line(
+                TowerField::AttackType,
+                "Attack Type: ".to_string(),
+                tower.attack_type.clone(),
+                Color::LightRed,
             ),
             Line::from(""),
             make_field_line(
