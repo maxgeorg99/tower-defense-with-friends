@@ -30,10 +30,8 @@ serde = { version = "1.0", features = ["derive"] }
 
 # Bevy demo dependencies
 bevy = { version = "0.17", optional = true }
-# Native: use original bevy_spacetimedb
-bevy_spacetimedb = { git = "https://github.com/JulienLavocat/bevy_spacetimedb", optional = true, default-features = false }
 # WASM: use fork with async connection support
-bevy_spacetimedb_wasm = { git = "https://github.com/maxgeorg99/bevy_spacetimedb_wasm", package = "bevy_spacetimedb", optional = true }
+bevy_spacetimedb = { git = "https://github.com/jkukatzki/bevy_spacetimedb", optional = true }
 spacetimedb-sdk = { git = "https://github.com/kistz/SpacetimeDB", branch = "rust-web-sdk-updated", features = ["web"], optional = true, default-features = false }
 # bevy_ecs_tiled - made optional because it pulls in zstd (C library) which doesn't compile to WASM
 bevy_ecs_tiled = { version = "0.10.0", default-features = false, features = ["render", "png"], optional = true }
@@ -60,7 +58,7 @@ devtools = ["dioxus-devtools"]
 bevy-demo = ["bevy", "bevy_spacetimedb", "spacetimedb-sdk", "dioxus-devtools", "notify", "tiny_http", "open", "url", "log", "sha2", "base64", "rand", "ureq", "serde_json", "ratatui", "ratatui-image", "crossterm", "bevy_ecs_tiled", "tiled"]
 bevy-hotpatch = ["bevy-demo", "bevy/hotpatching"]
 # WASM build - excludes native-only deps (notify, tiny_http, open, ureq), uses WASM-compatible bevy_spacetimedb fork
-bevy-wasm = ["bevy", "bevy_spacetimedb_wasm", "spacetimedb-sdk", "url", "log", "sha2", "base64", "rand", "serde_json", "getrandom"]
+bevy-wasm = ["bevy", "bevy_spacetimedb", "spacetimedb-sdk", "url", "log", "sha2", "base64", "rand", "serde_json", "getrandom"]
 
 # Patches for WASM compatibility
 [patch.crates-io]

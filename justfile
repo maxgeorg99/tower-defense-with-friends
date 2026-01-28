@@ -60,8 +60,8 @@ wasm-release:
 
 # Run WASM dev server (hot reload)
 wasm:
-    trunk serve --features bevy-wasm --open
+    trunk serve --features bevy-wasm --open --bin game
 
 # Run WASM connecting to maincloud
 wasm-live:
-    trunk serve --features bevy-wasm --open
+    trunk serve --features bevy-wasm --open --bin game

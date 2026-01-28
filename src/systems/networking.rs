@@ -86,3 +86,19 @@ pub fn on_user_deleted(messages: Option<ReadDeleteMessage<User>>) {
         info!("User removed: {}", name);
     }
 }
+
+/// WASM-only system to process SpacetimeDB messages each frame.
+/// On native, message processing happens in a background thread via run_threaded().
+/// On WASM, we don't have threads, so we process messages synchronously each frame.
+#[cfg(target_arch = "wasm32")]
+pub fn process_stdb_messages(stdb: Option<SpacetimeDB>) {
+    let Some(stdb) = stdb else {
+        return;
+    };
+
+    // Process all pending WebSocket messages via the underlying connection
+    if let Err(e) = stdb.conn().frame_tick() {
+        // Only log if it's not a normal disconnection
+        warn!("SpacetimeDB frame_tick error: {:?}", e);
+    }
+}

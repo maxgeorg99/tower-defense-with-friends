@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use bevy_ecs_tiled::prelude::*;
 use bevy_spacetimedb::*;
 use spacetimedb_sdk::Table;
@@ -59,7 +60,8 @@ pub fn setup_game(
     let color = get_player_color(&stdb);
     let color_dir = get_color_dir(color);
 
-    // Load and spawn the tilemap
+    // Load and spawn the tilemap (native only - bevy_ecs_tiled doesn't compile to WASM)
+    #[cfg(not(target_arch = "wasm32"))]
     commands.spawn((
         TiledMap(asset_server.load("map.tmx")),
         Transform::from_xyz(-480.0, -320.0, 0.0).with_scale(Vec3::splat(MAP_SCALE)),

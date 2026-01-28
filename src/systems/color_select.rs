@@ -2,7 +2,10 @@ use bevy::ecs::prelude::ChildSpawnerCommands;
 use bevy::prelude::*;
 use bevy_spacetimedb::*;
 use spacetimedb_sdk::Table;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::auth::AuthState;
+#[cfg(target_arch = "wasm32")]
+use crate::wasm_auth::AuthState;
 use crate::module_bindings::set_color_reducer::set_color;
 use crate::module_bindings::set_name_reducer::set_name;
 use crate::module_bindings::{Color as PlayerColor, DbConnection, MyUserTableAccess};

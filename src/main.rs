@@ -35,7 +35,7 @@ use systems::*;
 
 // WASM stubs for auth types
 #[cfg(target_arch = "wasm32")]
-mod wasm_auth {
+pub mod wasm_auth {
     use ::bevy::prelude::*;
 
     #[derive(Resource, Clone, Default)]
@@ -44,12 +44,23 @@ mod wasm_auth {
         pub callback_port: u16,
     }
 
+    /// User profile from ID token (stub for WASM)
+    #[derive(Clone, Debug, Default)]
+    pub struct UserProfile {
+        pub name: String,
+        pub preferred_username: Option<String>,
+        pub email: Option<String>,
+    }
+
     #[derive(Resource, Default)]
     pub struct AuthState {
         pub access_token: Option<String>,
         pub id_token: Option<String>,
         pub refresh_token: Option<String>,
+        pub token_expiry: Option<u64>,
+        pub user_profile: Option<UserProfile>,
         pub pending: bool,
+        pub error: Option<String>,
     }
 
     pub fn check_auth_and_connect() {}
@@ -123,7 +134,7 @@ fn main() {
     let stdb_plugin = StdbPlugin::<DbConnection, RemoteModule>::default()
         .with_uri(&stdb_uri)
         .with_module_name(&stdb_module)
-        .with_run_fn(DbConnection::run)
+        .with_run_fn(DbConnection::run_threaded)
         .with_delayed_connect(true)
         .add_table(|tables: &RemoteTables| tables.user());
 
@@ -158,6 +169,10 @@ fn main() {
     // Native-only auth systems
     #[cfg(not(target_arch = "wasm32"))]
     app.add_systems(Update, (handle_login_request, check_auth_and_connect));
+
+    // WASM-only: Process SpacetimeDB messages each frame (no threads on WASM)
+    #[cfg(target_arch = "wasm32")]
+    app.add_systems(Update, process_stdb_messages);
 
     app.add_systems(OnEnter(AppState::ColorSelect), connect_to_spacetimedb)
         .add_systems(
