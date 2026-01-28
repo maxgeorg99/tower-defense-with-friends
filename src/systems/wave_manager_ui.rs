@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::components::{AnimationTimer, Enemy};
+use crate::components::{get_defense_type_icon, AnimationTimer, DefenseType, Enemy};
 use crate::config::{UnitSpawn, UnitType, UnitsConfig, Wave, WavesConfig};
 use crate::resources::{AppState, EnemySpawner, GameState, PathWaypoints, WaveConfigs};
 use crate::resources::AppState::InGame;
@@ -230,7 +230,7 @@ fn spawn_enemy_row(
                             // Defense type icon
                             avatar.spawn((
                                 ImageNode::new(asset_server.load(
-                                    get_defense_type_icon(unit.defense_type.as_str())
+                                    get_defense_type_icon(DefenseType::from_str(&unit.defense_type))
                                 )),
                                 Node {
                                     width: Val::Px(18.0),
@@ -275,16 +275,6 @@ fn spawn_enemy_row(
                     TextColor(Color::WHITE),
                 ));
         });
-}
-
-
-fn get_defense_type_icon(defense_type: &str) -> &'static str {
-    match defense_type {
-        "armor" => "UI Elements/UI Elements/Icons/Defense_Icon.png",
-        "agility" => "UI Elements/UI Elements/Icons/Agility_Icon.png",
-        "mystical" => "UI Elements/UI Elements/Icons/Mystical_Icon.png",
-        _ => "UI Elements/UI Elements/Icons/Defense_Icon.png",
-    }
 }
 
 /// Update the timer text every frame

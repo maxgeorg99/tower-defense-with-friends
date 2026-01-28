@@ -1,6 +1,6 @@
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
-use crate::components::GameUI;
+use crate::components::{get_attack_type_icon, get_defense_type_icon, AttackType, DefenseType, GameUI};
 use crate::resources::GameState;
 
 #[derive(Component)]
@@ -166,9 +166,9 @@ pub fn setup_effectiveness_hint(mut commands: Commands, asset_server: Res<AssetS
                         ..default()
                     });
                     // Defense icons: Armor, Agility, Mystical
-                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Defense_Icon.png", icon_size);
-                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Agility_Icon.png", icon_size);
-                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Mystical_Icon.png", icon_size);
+                    spawn_icon(row, &asset_server, get_defense_type_icon(DefenseType::Armor), icon_size);
+                    spawn_icon(row, &asset_server, get_defense_type_icon(DefenseType::Agility), icon_size);
+                    spawn_icon(row, &asset_server, get_defense_type_icon(DefenseType::Mystical), icon_size);
                 });
 
             // Blunt row
@@ -180,7 +180,7 @@ pub fn setup_effectiveness_hint(mut commands: Commands, asset_server: Res<AssetS
                     ..default()
                 })
                 .with_children(|row| {
-                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Blunt_Icon.png", icon_size);
+                    spawn_icon(row, &asset_server, get_attack_type_icon(AttackType::Blunt), icon_size);
                     spawn_value_cell(row, "+25", strong_color, cell_size, font_size);
                     spawn_value_cell(row, "-15", weak_color, cell_size, font_size);
                     spawn_value_cell(row, "+10", strong_color, cell_size, font_size);
@@ -195,7 +195,7 @@ pub fn setup_effectiveness_hint(mut commands: Commands, asset_server: Res<AssetS
                     ..default()
                 })
                 .with_children(|row| {
-                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Pierce_Icon.png", icon_size);
+                    spawn_icon(row, &asset_server, get_attack_type_icon(AttackType::Pierce), icon_size);
                     spawn_value_cell(row, "-20", weak_color, cell_size, font_size);
                     spawn_value_cell(row, "+25", strong_color, cell_size, font_size);
                     spawn_value_cell(row, "-10", weak_color, cell_size, font_size);
@@ -210,7 +210,7 @@ pub fn setup_effectiveness_hint(mut commands: Commands, asset_server: Res<AssetS
                     ..default()
                 })
                 .with_children(|row| {
-                    spawn_icon(row, &asset_server, "UI Elements/UI Elements/Icons/Divine_Icon.png", icon_size);
+                    spawn_icon(row, &asset_server, get_attack_type_icon(AttackType::Divine), icon_size);
                     spawn_value_cell(row, "0", neutral_color, cell_size, font_size);
                     spawn_value_cell(row, "-10", weak_color, cell_size, font_size);
                     spawn_value_cell(row, "+30", strong_color, cell_size, font_size);

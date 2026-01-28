@@ -2,7 +2,8 @@ use bevy::prelude::*;
 use bevy::ecs::prelude::ChildSpawnerCommands;
 use bevy_spacetimedb::StdbConnection;
 use spacetimedb_sdk::Table;
-use crate::components::{AttackType, Enemy, Tower, TowerLevel, TowerUpgradeMenu, TowerUpgradeOption, TowerWheelMenu, TowerWheelOption, Projectile, UpgradeType, WorkerBuilding};
+use crate::components::{get_attack_type_icon, get_damage_multiplier, AttackType, AnimationTimer, Enemy, HolyTowerEffect, Tower, TowerLevel, TowerUpgradeMenu, TowerUpgradeOption, TowerWheelMenu, TowerWheelOption, Projectile, UpgradeType, WorkerBuilding};
+use crate::systems::AnimationInfo;
 use crate::config::TowerType;
 use crate::constants::{ARROW_SIZE, EXPLORE_COST, EXPLORE_RADIUS, SCALED_TILE_SIZE, TOWER_SIZE};
 use crate::map::world_to_tile;
@@ -218,6 +219,22 @@ pub fn show_tower_wheel_menu(
 
                         commands.entity(circle_entity).add_child(sprite_entity);
 
+                        // Add damage type badge (similar to wave_manager_ui defense type badge)
+                        let attack_type = AttackType::from_str(&tower_type.attack_type);
+                        let badge_entity = commands
+                            .spawn((
+                                Sprite {
+                                    image: asset_server.load(get_attack_type_icon(attack_type)),
+                                    custom_size: Some(Vec2::splat(18.0)),
+                                    ..default()
+                                },
+                                // Position at bottom-right corner, slightly outside
+                                Transform::from_xyz(22.0, -22.0, 0.2),
+                            ))
+                            .id();
+
+                        commands.entity(circle_entity).add_child(badge_entity);
+
                         // Add tower name below
                         let name_entity = commands
                             .spawn((
@@ -372,12 +389,20 @@ pub fn handle_tower_selection(
     }
 }
 
+// Holy tower heal effect constants
+const HEAL_FRAME_SIZE: UVec2 = UVec2::new(192, 192);
+const HEAL_FRAME_COUNT: usize = 11;
+const HEAL_ANIMATION_DURATION: f32 = 1.1; // 11 frames at 0.1s each
+
 pub fn tower_shooting(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
     mut towers: Query<(&Transform, &mut Tower)>,
-    enemies: Query<(Entity, &Transform), (With<Enemy>, Without<Tower>)>,
+    mut enemies: Query<(Entity, &Transform, &mut Enemy), Without<Tower>>,
+    mut game_state: ResMut<GameState>,
     time: Res<Time>,
+    stdb: Option<SpacetimeDB>,
 ) {
     for (tower_transform, mut tower) in towers.iter_mut() {
         tower.cooldown -= time.delta_secs();
@@ -386,7 +411,7 @@ pub fn tower_shooting(
             // Find closest enemy in range
             let mut closest_enemy: Option<(Entity, f32)> = None;
 
-            for (enemy_entity, enemy_transform) in enemies.iter() {
+            for (enemy_entity, enemy_transform, _) in enemies.iter() {
                 let distance = tower_transform
                     .translation
                     .distance(enemy_transform.translation);
@@ -402,25 +427,112 @@ pub fn tower_shooting(
                 }
             }
 
-            // Shoot at closest enemy
+            // Handle attack based on tower type
             if let Some((target_entity, _)) = closest_enemy {
-                // Scale projectile to be about half a tile
-                let projectile_scale = (SCALED_TILE_SIZE * 0.5) / ARROW_SIZE.x;
+                // Holy tower: instant damage with holy effect on enemy
+                if tower.tower_type_id == "holy" {
+                    // Deal instant damage to target
+                    if let Ok((_enemy_entity, enemy_transform, mut enemy)) = enemies.get_mut(target_entity) {
+                        let multiplier = get_damage_multiplier(tower.attack_type, enemy.defense_type);
+                        let final_damage = tower.damage * multiplier;
+                        enemy.health -= final_damage;
 
-                commands.spawn((
-                    Sprite::from_image(asset_server.load(&tower.projectile_sprite)),
-                    Transform::from_translation(tower_transform.translation)
-                        .with_scale(Vec3::splat(projectile_scale)),
-                    Projectile {
-                        damage: tower.damage,
-                        speed: tower.projectile_speed,
-                        target: target_entity,
-                        attack_type: tower.attack_type,
-                    },
-                ));
+                        // Spawn holy effect at enemy position
+                        spawn_holy_tower_effect(
+                            &mut commands,
+                            &asset_server,
+                            &mut texture_atlases,
+                            enemy_transform.translation,
+                        );
+
+                        // Check if enemy died from instant damage
+                        if enemy.health <= 0.0 {
+                            game_state.gold += enemy.gold_reward;
+                            game_state.score += enemy.gold_reward;
+                        }
+                    }
+                } else {
+                    // Regular towers: spawn projectile
+                    let projectile_scale = (SCALED_TILE_SIZE * 0.5) / ARROW_SIZE.x;
+
+                    commands.spawn((
+                        Sprite::from_image(asset_server.load(&tower.projectile_sprite)),
+                        Transform::from_translation(tower_transform.translation)
+                            .with_scale(Vec3::splat(projectile_scale)),
+                        Projectile {
+                            damage: tower.damage,
+                            speed: tower.projectile_speed,
+                            target: target_entity,
+                            attack_type: tower.attack_type,
+                        },
+                    ));
+                }
 
                 tower.cooldown = tower.fire_rate;
             }
+        }
+    }
+}
+
+/// Spawn holy smite effect on the enemy (gold-tinted heal effect)
+fn spawn_holy_tower_effect(
+    commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
+    texture_atlases: &mut ResMut<Assets<TextureAtlasLayout>>,
+    enemy_position: Vec3,
+) {
+    // Use Yellow monk's heal effect as base (will be tinted gold)
+    let heal_effect_path = "Units/Yellow Units/Monk/Heal_Effect.png";
+
+    // Create texture atlas layout for heal animation
+    let layout = TextureAtlasLayout::from_grid(HEAL_FRAME_SIZE, HEAL_FRAME_COUNT as u32, 1, None, None);
+    let effect_atlas_layout = texture_atlases.add(layout);
+
+    let effect_scale = SCALED_TILE_SIZE * 1.5 / HEAL_FRAME_SIZE.x as f32;
+
+    // Gold/holy tint color
+    let holy_gold_tint = Color::srgb(1.0, 0.85, 0.3);
+
+    // Spawn holy effect on enemy (gold-tinted aura)
+    commands.spawn((
+        Sprite {
+            image: asset_server.load(heal_effect_path),
+            color: holy_gold_tint,
+            texture_atlas: Some(TextureAtlas {
+                layout: effect_atlas_layout,
+                index: 0,
+            }),
+            ..default()
+        },
+        Transform::from_translation(enemy_position + Vec3::new(0.0, 0.0, 5.0))
+            .with_scale(Vec3::splat(effect_scale)),
+        AnimationTimer {
+            timer: Timer::from_seconds(0.1, TimerMode::Repeating),
+        },
+        AnimationInfo {
+            frame_count: HEAL_FRAME_COUNT,
+        },
+        HolyTowerEffect {
+            lifetime: Timer::from_seconds(HEAL_ANIMATION_DURATION, TimerMode::Once),
+        },
+    ));
+}
+
+/// Update and cleanup holy tower visual effects
+pub fn update_holy_tower_effects(
+    mut commands: Commands,
+    mut effects: Query<(Entity, &mut HolyTowerEffect)>,
+    time: Res<Time>,
+) {
+    for (entity, mut effect) in effects.iter_mut() {
+        effect.lifetime.tick(time.delta());
+
+        if effect.lifetime.finished() {
+            commands.queue_silenced(move |world: &mut World| {
+                if let Ok(entity_mut) = world.get_entity_mut(entity) {
+                    entity_mut.despawn();
+                }
+            });
         }
     }
 }

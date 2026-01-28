@@ -136,6 +136,7 @@ fn main() {
                 hide_tower_wheel_menu,
                 handle_tower_selection,
                 tower_shooting,
+                update_holy_tower_effects,
                 move_projectiles,
                 handle_projectile_hits,
                 update_health_bars,

@@ -233,3 +233,27 @@ pub struct TowerLevel {
     pub range_level: i32,
     pub fire_rate_level: i32,
 }
+
+/// Temporary visual effect component for holy tower heal animation
+#[derive(Component)]
+pub struct HolyTowerEffect {
+    pub lifetime: Timer,
+}
+
+/// Helper to get attack type icon path
+pub fn get_attack_type_icon(attack_type: AttackType) -> &'static str {
+    match attack_type {
+        AttackType::Blunt => "Decorations/Rocks/Rock2.png",
+        AttackType::Pierce => "Units/Blue Units/Archer/Arrow.png",
+        AttackType::Divine => "UI Elements/UI Elements/Icons/Divine_Icon.png",
+    }
+}
+
+/// Helper to get defense type icon path
+pub fn get_defense_type_icon(defense_type: DefenseType) -> &'static str {
+    match defense_type {
+        DefenseType::Armor => "UI Elements/UI Elements/Icons/Defense_Icon.png",
+        DefenseType::Agility => "UI Elements/UI Elements/Icons/Agility_Icon.png",
+        DefenseType::Mystical => "UI Elements/UI Elements/Icons/Mystical_Icon.png",
+    }
+}
