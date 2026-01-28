@@ -9,7 +9,7 @@ exclude = ["spacetimedb"]
 [[bin]]
 name = "game"
 path = "src/main.rs"
-required-features = ["bevy-demo"]
+# Requires either bevy-demo (native) or bevy-wasm (web)
 
 [[bin]]
 name = "wave-manager"
@@ -20,19 +20,27 @@ name = "tower-manager"
 path = "src/tower_manager.rs"
 
 [dependencies]
-ratatui = "0.30.0"
-ratatui-image = "10.0.2"
+ratatui = { version = "0.30.0", optional = true }
+ratatui-image = { version = "10.0.2", optional = true }
 image = "0.25.9"
-crossterm = "0.29.0"
+crossterm = { version = "0.29.0", optional = true }
 dioxus-devtools = { version = "0.7", optional = true }
 toml = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 
 # Bevy demo dependencies
 bevy = { version = "0.17", optional = true }
-bevy_spacetimedb = { git = "https://github.com/JulienLavocat/bevy_spacetimedb", optional = true }
-spacetimedb-sdk = { version = "1.11", optional = true }
-bevy_ecs_tiled = "0.10.0"
+# Native: use original bevy_spacetimedb
+bevy_spacetimedb = { git = "https://github.com/JulienLavocat/bevy_spacetimedb", optional = true, default-features = false }
+# WASM: use fork with async connection support
+bevy_spacetimedb_wasm = { git = "https://github.com/maxgeorg99/bevy_spacetimedb_wasm", package = "bevy_spacetimedb", optional = true }
+spacetimedb-sdk = { git = "https://github.com/kistz/SpacetimeDB", branch = "rust-web-sdk-updated", features = ["web"], optional = true, default-features = false }
+# bevy_ecs_tiled - made optional because it pulls in zstd (C library) which doesn't compile to WASM
+bevy_ecs_tiled = { version = "0.10.0", default-features = false, features = ["render", "png"], optional = true }
+tiled = { version = "0.15", default-features = false, optional = true }
+
+# WASM: Enable js feature for getrandom to use browser crypto API
+getrandom = { version = "0.2", features = ["js"], optional = true }
 notify = { version = "7.0", optional = true }
 
 # Auth dependencies
@@ -49,5 +57,13 @@ serde_json = { version = "1.0", optional = true }
 [features]
 default = []
 devtools = ["dioxus-devtools"]
-bevy-demo = ["bevy", "bevy_spacetimedb", "spacetimedb-sdk", "dioxus-devtools", "notify", "tiny_http", "open", "url", "log", "sha2", "base64", "rand", "ureq", "serde_json"]
+bevy-demo = ["bevy", "bevy_spacetimedb", "spacetimedb-sdk", "dioxus-devtools", "notify", "tiny_http", "open", "url", "log", "sha2", "base64", "rand", "ureq", "serde_json", "ratatui", "ratatui-image", "crossterm", "bevy_ecs_tiled", "tiled"]
 bevy-hotpatch = ["bevy-demo", "bevy/hotpatching"]
+# WASM build - excludes native-only deps (notify, tiny_http, open, ureq), uses WASM-compatible bevy_spacetimedb fork
+bevy-wasm = ["bevy", "bevy_spacetimedb_wasm", "spacetimedb-sdk", "url", "log", "sha2", "base64", "rand", "serde_json", "getrandom"]
+
+# Patches for WASM compatibility
+[patch.crates-io]
+# Use WASM-compatible spacetimedb-sdk fork for all dependents (including bevy_spacetimedb)
+spacetimedb-sdk = { git = "https://github.com/kistz/SpacetimeDB", branch = "rust-web-sdk-updated" }
+

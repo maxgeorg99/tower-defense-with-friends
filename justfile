@@ -47,3 +47,21 @@ wave-manager:
 
 tower-manager:
     cargo run --bin tower-manager
+
+# === WASM ===
+
+# Build WASM target (requires: rustup target add wasm32-unknown-unknown && cargo install trunk)
+wasm-build:
+    trunk build --features bevy-wasm
+
+# Build WASM release
+wasm-release:
+    trunk build --release --features bevy-wasm
+
+# Run WASM dev server (hot reload)
+wasm:
+    trunk serve --features bevy-wasm --open
+
+# Run WASM connecting to maincloud
+wasm-live:
+    trunk serve --features bevy-wasm --open

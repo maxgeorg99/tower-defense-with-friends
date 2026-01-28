@@ -70,15 +70,21 @@ pub struct WavesConfig {
 
 impl UnitsConfig {
     pub fn load() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        #[cfg(not(target_arch = "wasm32"))]
         let content = std::fs::read_to_string("units.toml")?;
-        Ok(toml::from_str(&content)?)
+        #[cfg(target_arch = "wasm32")]
+        let content = include_str!("../units.toml");
+        Ok(toml::from_str(content)?)
     }
 }
 
 impl WavesConfig {
     pub fn load() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        #[cfg(not(target_arch = "wasm32"))]
         let content = std::fs::read_to_string("waves.toml")?;
-        Ok(toml::from_str(&content)?)
+        #[cfg(target_arch = "wasm32")]
+        let content = include_str!("../waves.toml");
+        Ok(toml::from_str(content)?)
     }
 }
 
@@ -89,7 +95,10 @@ pub struct TowersConfig {
 
 impl TowersConfig {
     pub fn load() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        #[cfg(not(target_arch = "wasm32"))]
         let content = std::fs::read_to_string("towers.toml")?;
-        Ok(toml::from_str(&content)?)
+        #[cfg(target_arch = "wasm32")]
+        let content = include_str!("../towers.toml");
+        Ok(toml::from_str(content)?)
     }
 }
