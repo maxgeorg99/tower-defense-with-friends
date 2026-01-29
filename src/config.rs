@@ -73,8 +73,8 @@ impl UnitsConfig {
         #[cfg(not(target_arch = "wasm32"))]
         let content = std::fs::read_to_string("units.toml")?;
         #[cfg(target_arch = "wasm32")]
-        let content = include_str!("../units.toml");
-        Ok(toml::from_str(content)?)
+        let content = include_str!("../units.toml").to_string();
+        Ok(toml::from_str(&content)?)
     }
 }
 
@@ -83,8 +83,8 @@ impl WavesConfig {
         #[cfg(not(target_arch = "wasm32"))]
         let content = std::fs::read_to_string("waves.toml")?;
         #[cfg(target_arch = "wasm32")]
-        let content = include_str!("../waves.toml");
-        Ok(toml::from_str(content)?)
+        let content = include_str!("../waves.toml").to_string();
+        Ok(toml::from_str(&content)?)
     }
 }
 
@@ -98,7 +98,7 @@ impl TowersConfig {
         #[cfg(not(target_arch = "wasm32"))]
         let content = std::fs::read_to_string("towers.toml")?;
         #[cfg(target_arch = "wasm32")]
-        let content = include_str!("../towers.toml");
-        Ok(toml::from_str(content)?)
+        let content = include_str!("../towers.toml").to_string();
+        Ok(toml::from_str(&content)?)
     }
 }

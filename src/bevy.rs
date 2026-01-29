@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::asset::AssetPlugin;
 #[cfg(not(target_arch = "wasm32"))]
 use bevy_ecs_tiled::prelude::*;
 
@@ -19,14 +20,23 @@ impl Plugin for BevyPlugin {
         .add_plugins(TiledPlugin::default());
 
         #[cfg(target_arch = "wasm32")]
-        app.add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Tower Defense MMO".to_string(),
-                resolution: (1024u32, 768u32).into(),
-                canvas: Some("#bevy".to_string()),
-                ..default()
-            }),
-            ..default()
-        }));
+        app.add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Tower Defense MMO".to_string(),
+                        resolution: (1024u32, 768u32).into(),
+                        canvas: Some("#bevy".to_string()),
+                        fit_canvas_to_parent: true,
+                        prevent_default_event_handling: true,
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(AssetPlugin {
+                    meta_check: bevy::asset::AssetMetaCheck::Never,
+                    ..default()
+                }),
+        );
     }
 }

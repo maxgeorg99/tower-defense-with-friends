@@ -4,6 +4,8 @@ mod auth;
 mod debug;
 #[cfg(any(feature = "bevy-demo", feature = "bevy-wasm"))]
 mod module_bindings;
+#[cfg(target_arch = "wasm32")]
+mod wasm_tilemap;
 
 mod bevy;
 mod components;
@@ -115,6 +117,9 @@ fn main() {
         .add_plugins(CursorPlugin)
         .add_plugins(WaveManagerPlugin);
 
+    #[cfg(target_arch = "wasm32")]
+    app.add_plugins(wasm_tilemap::WasmTilemapPlugin);
+
     // Store connection config for deferred connection
     app.insert_resource(StdbConfig {
         uri: stdb_uri.clone(),
@@ -122,15 +127,8 @@ fn main() {
         token: stdb_token.clone(),
     });
 
-    #[cfg(not(target_arch = "wasm32"))]
-    let stdb_plugin = StdbPlugin::<DbConnection, RemoteModule>::default()
-        .with_uri(&stdb_uri)
-        .with_module_name(&stdb_module)
-        .with_run_fn(DbConnection::run_threaded)
-        .with_delayed_connect(true)
-        .add_table(|tables: &RemoteTables| tables.user());
-
-    #[cfg(target_arch = "wasm32")]
+    // Plugin setup is the same for both native and WASM - the plugin internally handles
+    // platform differences (e.g., always using delayed_connect on WASM)
     let stdb_plugin = StdbPlugin::<DbConnection, RemoteModule>::default()
         .with_uri(&stdb_uri)
         .with_module_name(&stdb_module)

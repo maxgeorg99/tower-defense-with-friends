@@ -13,10 +13,13 @@
             overflow: hidden;
             background-color: #1a1a2e;
         }
-        canvas {
+        canvas, #bevy {
             display: block;
             width: 100%;
             height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
         #loading {
             position: absolute;
@@ -28,6 +31,7 @@
             font-size: 1.5em;
         }
     </style>
+    <link data-trunk rel="rust" data-bin="game" data-cargo-features="bevy-wasm"/>
     <link data-trunk rel="copy-dir" href="assets"/>
     <link data-trunk rel="copy-file" href="units.toml"/>
     <link data-trunk rel="copy-file" href="waves.toml"/>
@@ -35,6 +39,7 @@
 </head>
 <body>
     <div id="loading">Loading game...</div>
+    <canvas id="bevy"></canvas>
     <script type="module">
         import init from './game.js';
         init().then(() => {

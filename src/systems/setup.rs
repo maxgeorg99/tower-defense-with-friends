@@ -36,7 +36,7 @@ pub fn setup_camera(mut commands: Commands) {
 }
 
 /// Connect to SpacetimeDB using the delayed connection feature
-/// This runs when entering InGame state and establishes the connection with optional token
+/// This runs when entering ColorSelect state and establishes the connection with optional token
 pub fn connect_to_spacetimedb(world: &mut World) {
     let token = world
         .get_resource::<StdbConfig>()
@@ -44,11 +44,12 @@ pub fn connect_to_spacetimedb(world: &mut World) {
 
     if token.is_some() {
         info!("Connecting to SpacetimeDB with auth token...");
-        connect_with_token::<DbConnection, RemoteModule>(world, token);
     } else {
         info!("Connecting to SpacetimeDB anonymously...");
     }
 
+    // Always call connect_with_token - it works with None for anonymous connection
+    connect_with_token::<DbConnection, RemoteModule>(world, token);
 }
 
 /// Setup game elements (runs when entering InGame state)
