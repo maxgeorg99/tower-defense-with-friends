@@ -50,18 +50,33 @@ tower-manager:
 
 # === WASM ===
 
-# Build WASM target (requires: rustup target add wasm32-unknown-unknown && cargo install trunk)
+# Build WASM debug (requires: rustup target add wasm32-unknown-unknown && cargo install trunk)
 wasm-build:
-    trunk build --features bevy-wasm
+    trunk build
 
 # Build WASM release
 wasm-release:
-    trunk build --release --features bevy-wasm
+    trunk build --release
 
-# Run WASM dev server (hot reload)
+# Run WASM dev server (hot reload, debug build)
 wasm:
-    trunk serve --features bevy-wasm --open --bin game
+    trunk serve --open
 
-# Run WASM connecting to maincloud
+# Run WASM release server
 wasm-live:
-    trunk serve --features bevy-wasm --open --bin game
+    trunk serve --release --open
+
+# Clean WASM build artifacts
+wasm-clean:
+    rm -rf dist/.stage target/wasm-opt
+
+# === Bindings ===
+
+# Regenerate bindings and apply WASM patches
+regenerate: generate patch-bindings
+
+# Apply WASM patches to module_bindings (run after `just generate`)
+patch-bindings:
+    @echo "Patching module_bindings for WASM compatibility..."
+    ./patch_module_bindings.sh
+    @echo "Done!"

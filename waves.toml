@@ -22,11 +22,6 @@ count = 8
 health_multiplier = 1.2000000476837158
 
 [[waves.spawns]]
-unit_id = "goblin_lancer"
-count = 5
-health_multiplier = 1.0
-
-[[waves.spawns]]
 unit_id = "thief"
 count = 5
 health_multiplier = 1.0
