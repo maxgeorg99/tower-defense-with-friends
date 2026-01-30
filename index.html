@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
     <title>Tower Defense with Friends</title>
     <style>
         html, body {
@@ -40,12 +42,9 @@
 <body>
     <div id="loading">Loading game...</div>
     <canvas id="bevy"></canvas>
-    <script type="module">
-        import init from './game.js';
-        init().then(() => {
+    <script>
+        window.addEventListener('TrunkApplicationStarted', function() {
             document.getElementById('loading').style.display = 'none';
-        }).catch((error) => {
-            document.getElementById('loading').textContent = 'Failed to load: ' + error;
         });
     </script>
 </body>
