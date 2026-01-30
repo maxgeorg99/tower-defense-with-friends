@@ -17,18 +17,53 @@ wave_number = 2
 spawn_interval = 1.7999999523162842
 
 [[waves.spawns]]
-unit_id = "warrior"
-count = 8
+unit_id = "skull"
+count = 1
 health_multiplier = 1.2000000476837158
 
 [[waves.spawns]]
+unit_id = "goblin_lancer"
+count = 1
+health_multiplier = 1.0
+
+[[waves.spawns]]
 unit_id = "thief"
-count = 5
+count = 1
 health_multiplier = 1.0
 
 [[waves.spawns]]
 unit_id = "shaman"
-count = 5
+count = 1
+health_multiplier = 1.0
+
+[[waves.spawns]]
+unit_id = "paddle_fish"
+count = 1
+health_multiplier = 1.0
+
+[[waves.spawns]]
+unit_id = "harpoon_fish"
+count = 1
+health_multiplier = 1.0
+
+[[waves.spawns]]
+unit_id = "turtle"
+count = 1
+health_multiplier = 1.0
+
+[[waves.spawns]]
+unit_id = "minotaur"
+count = 1
+health_multiplier = 1.0
+
+[[waves.spawns]]
+unit_id = "panda"
+count = 1
+health_multiplier = 1.0
+
+[[waves.spawns]]
+unit_id = "spider"
+count = 1
 health_multiplier = 1.0
 
 [[waves]]
@@ -75,22 +110,4 @@ spawn_interval = 0.10000000149011612
 [[waves.spawns]]
 unit_id = "warrior"
 count = 5500
-health_multiplier = 1.0
-
-[[waves]]
-wave_number = 7
-spawn_interval = 2.0
-
-[[waves.spawns]]
-unit_id = "warrior"
-count = 5
-health_multiplier = 1.0
-
-[[waves]]
-wave_number = 8
-spawn_interval = 2.0
-
-[[waves.spawns]]
-unit_id = "snake"
-count = 5
 health_multiplier = 1.0
