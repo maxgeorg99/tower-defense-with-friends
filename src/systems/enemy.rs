@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::components::{AnimationTimer, DefenseType, Enemy, HealthBar, HealthBarFill};
 use crate::constants::{SCALED_TILE_SIZE, WARRIOR_FRAME_SIZE};
 use crate::resources::{EnemySpawner, GameState, PathWaypoints, WaveConfigs};
-use crate::systems::WaveManager;
+use crate::systems::{SoundEffect, WaveManager};
 
 #[derive(Component)]
 pub struct AnimationInfo {
@@ -181,6 +181,7 @@ pub fn move_enemies(
     time: Res<Time>,
     mut game_state: ResMut<GameState>,
     waypoints: Res<PathWaypoints>,
+    mut sound_events: EventWriter<SoundEffect>,
 ) {
     for (entity, mut transform, mut enemy, children) in enemies.iter_mut() {
         // Get current and next waypoint
@@ -202,6 +203,7 @@ pub fn move_enemies(
                 }
             });
             game_state.lives -= enemy.damage_to_base;
+            sound_events.write(SoundEffect::CastleDamage);
             continue;
         }
 

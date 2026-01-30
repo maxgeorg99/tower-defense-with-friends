@@ -6,6 +6,7 @@ use crate::components::{RecruitMenu, RecruitOption};
 use crate::map::world_to_tile;
 use crate::module_bindings::{DbConnection, Color as PlayerColor, MyUserTableAccess};
 use crate::resources::{BlockedTiles, GameState, RecruitMenuState, TowerWheelState};
+use crate::systems::SoundEffect;
 
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
 
@@ -321,9 +322,11 @@ pub fn handle_recruit_selection(
     mut game_state: ResMut<GameState>,
     mut menu_state: ResMut<RecruitMenuState>,
     menu_entities: Query<Entity, With<RecruitMenu>>,
+    mut sound_events: EventWriter<SoundEffect>,
 ) {
     for (interaction, option) in interaction_query.iter_mut() {
         if *interaction == Interaction::Pressed {
+            sound_events.write(SoundEffect::ButtonClick);
             if game_state.meat >= option.meat_cost {
                 game_state.meat -= option.meat_cost;
                 info!(

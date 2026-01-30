@@ -28,6 +28,7 @@ use auth::{
     start_login,
 };
 use bevy::BevyPlugin;
+use bevy_kira_audio::AudioPlugin;
 #[cfg(all(feature = "bevy-demo", not(target_arch = "wasm32")))]
 use debug::DebugPlugin;
 use events::EventPlugin;
@@ -111,11 +112,16 @@ fn main() {
     let mut app = App::new();
 
     app.add_plugins(BevyPlugin)
+        .add_plugins(AudioPlugin)
         .add_plugins(EventPlugin)
         .add_plugins(MenuPlugin)
+        .add_plugins(SettingsPlugin)
         .add_plugins(ColorSelectPlugin)
         .add_plugins(CursorPlugin)
         .add_plugins(WaveManagerPlugin);
+
+    #[allow(deprecated)]
+    app.add_event::<SoundEffect>();
 
     #[cfg(target_arch = "wasm32")]
     app.add_plugins(wasm_tilemap::WasmTilemapPlugin);
@@ -162,7 +168,8 @@ fn main() {
             let (blocked, castle) = create_blocked_tiles();
             BlockedTiles { tiles: blocked, castle_tiles: castle }
         })
-        .add_systems(Startup, setup_camera);
+        .add_systems(Startup, (setup_camera, load_sound_assets))
+        .add_systems(Update, play_sound_effects);
 
     // Native-only auth systems
     #[cfg(not(target_arch = "wasm32"))]
@@ -172,7 +179,8 @@ fn main() {
     #[cfg(target_arch = "wasm32")]
     app.add_systems(Update, process_stdb_messages);
 
-    app.add_systems(OnEnter(AppState::ColorSelect), connect_to_spacetimedb)
+    app.add_systems(Update, start_background_music)
+        .add_systems(OnEnter(AppState::ColorSelect), connect_to_spacetimedb)
         .add_systems(
             OnEnter(AppState::InGame),
             (setup_game, setup_fog_of_war, setup_online_users_ui, setup_top_bar, setup_effectiveness_hint, setup_resource_gathering).chain(),
@@ -204,6 +212,12 @@ fn main() {
                 handle_projectile_hits,
                 update_health_bars,
                 update_top_bar,
+            )
+                .run_if(in_state(AppState::InGame)),
+        )
+        .add_systems(
+            Update,
+            (
                 show_recruit_menu,
                 hide_recruit_menu,
                 handle_recruit_selection,

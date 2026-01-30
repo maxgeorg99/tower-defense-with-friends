@@ -3,7 +3,7 @@ use bevy::ecs::prelude::ChildSpawnerCommands;
 use bevy_spacetimedb::StdbConnection;
 use spacetimedb_sdk::Table;
 use crate::components::{get_attack_type_icon, get_damage_multiplier, AttackType, AnimationTimer, Enemy, HolyTowerEffect, Tower, TowerLevel, TowerUpgradeMenu, TowerUpgradeOption, TowerWheelMenu, TowerWheelOption, Projectile, UpgradeType, WorkerBuilding};
-use crate::systems::AnimationInfo;
+use crate::systems::{AnimationInfo, SoundEffect};
 use crate::config::TowerType;
 use crate::constants::{ARROW_SIZE, EXPLORE_COST, EXPLORE_RADIUS, SCALED_TILE_SIZE, TOWER_SIZE};
 use crate::map::world_to_tile;
@@ -403,6 +403,7 @@ pub fn tower_shooting(
     mut game_state: ResMut<GameState>,
     time: Res<Time>,
     stdb: Option<SpacetimeDB>,
+    mut sound_events: EventWriter<SoundEffect>,
 ) {
     for (tower_transform, mut tower) in towers.iter_mut() {
         tower.cooldown -= time.delta_secs();
@@ -466,6 +467,7 @@ pub fn tower_shooting(
                             attack_type: tower.attack_type,
                         },
                     ));
+                    sound_events.write(SoundEffect::ArrowShoot);
                 }
 
                 tower.cooldown = tower.fire_rate;
@@ -856,9 +858,11 @@ pub fn handle_tower_upgrade(
     mut menu_state: ResMut<TowerUpgradeMenuState>,
     menu_entities: Query<Entity, With<TowerUpgradeMenu>>,
     mut towers: Query<(&mut Tower, &mut TowerLevel)>,
+    mut sound_events: EventWriter<SoundEffect>,
 ) {
     for (interaction, option) in interaction_query.iter_mut() {
         if *interaction == Interaction::Pressed {
+            sound_events.write(SoundEffect::ButtonClick);
             if game_state.wood >= option.wood_cost {
                 if let Some(tower_entity) = menu_state.selected_tower {
                     if let Ok((mut tower, mut tower_level)) = towers.get_mut(tower_entity) {

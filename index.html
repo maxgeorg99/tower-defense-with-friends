@@ -6,6 +6,34 @@
     <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
     <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
     <title>Tower Defense with Friends</title>
+    <script>
+        // Fix for browser autoplay policy - resumes AudioContext on first user interaction
+        (function () {
+            const audioContextList = [];
+            const userInputEventNames = [
+                'click', 'contextmenu', 'auxclick', 'dblclick',
+                'mousedown', 'mouseup', 'pointerup', 'touchend', 'keydown', 'keyup',
+            ];
+            self.AudioContext = new Proxy(self.AudioContext, {
+                construct(target, args) {
+                    const result = new target(...args);
+                    audioContextList.push(result);
+                    return result;
+                },
+            });
+            function resumeAllContexts() {
+                let count = 0;
+                audioContextList.forEach(ctx => {
+                    if (ctx.state !== 'running') ctx.resume();
+                    else count++;
+                });
+                if (count === audioContextList.length) {
+                    userInputEventNames.forEach(e => document.removeEventListener(e, resumeAllContexts));
+                }
+            }
+            userInputEventNames.forEach(e => document.addEventListener(e, resumeAllContexts));
+        })();
+    </script>
     <style>
         html, body {
             margin: 0;

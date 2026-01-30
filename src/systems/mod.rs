@@ -1,3 +1,4 @@
+pub mod audio;
 pub mod camera;
 pub mod color_select;
 pub mod cursor;
@@ -9,6 +10,7 @@ pub mod networking;
 pub mod player_list;
 pub mod projectile;
 pub mod recruit;
+pub mod settings;
 pub mod setup;
 pub mod tower;
 pub mod ui;
@@ -16,6 +18,7 @@ pub mod wave_manager_ui;
 pub mod top_bar;
 pub mod worker;
 
+pub use audio::*;
 pub use camera::*;
 pub use color_select::*;
 pub use cursor::*;
@@ -27,6 +30,7 @@ pub use networking::*;
 pub use player_list::*;
 pub use projectile::*;
 pub use recruit::*;
+pub use settings::*;
 pub use setup::*;
 pub use tower::*;
 pub use ui::*;

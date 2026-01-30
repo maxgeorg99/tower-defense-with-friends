@@ -11,6 +11,7 @@ use crate::module_bindings::set_name_reducer::set_name;
 use crate::module_bindings::{Color as PlayerColor, DbConnection, MyUserTableAccess};
 use crate::resources::AppState;
 use crate::systems::menu::{ButtonStyle, spawn_nine_slice_button};
+use crate::systems::SoundEffect;
 
 /// Type alias for cleaner SpacetimeDB resource access
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
@@ -35,6 +36,10 @@ pub struct UsernameInput;
 #[derive(Component)]
 pub struct ContinueButton;
 
+/// Marker for the back button
+#[derive(Component)]
+pub struct ColorSelectBackButton;
+
 /// Resource to store the current username being edited
 #[derive(Resource, Default)]
 pub struct UsernameInputState {
@@ -56,6 +61,7 @@ impl Plugin for ColorSelectPlugin {
                     update_color_button_visuals,
                     handle_username_input,
                     handle_continue_button,
+                    handle_color_select_back_button,
                 ).run_if(in_state(AppState::ColorSelect)),
             )
             .add_systems(OnExit(AppState::ColorSelect), cleanup_color_select_screen);
@@ -190,6 +196,28 @@ fn setup_color_select_screen(
             // Continue button
             spawn_nine_slice_button(parent, &asset_server, ButtonStyle::SmallBlueRound, "CONTINUE", ContinueButton);
         });
+
+    // Back button in bottom-right corner (like login button on main menu)
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: Val::Px(50.0),
+                right: Val::Px(50.0),
+                ..default()
+            },
+            GlobalZIndex(10),
+            ColorSelectScreen,
+        ))
+        .with_children(|parent| {
+            spawn_nine_slice_button(
+                parent,
+                &asset_server,
+                ButtonStyle::SmallBlueRound,
+                "BACK",
+                ColorSelectBackButton,
+            );
+        });
 }
 
 fn spawn_color_button(
@@ -235,13 +263,12 @@ fn spawn_color_button(
 pub fn handle_color_button_click(
     stdb: Option<SpacetimeDB>,
     interaction_query: Query<(&Interaction, &ColorButton), (Changed<Interaction>, With<Button>)>,
+    mut sound_events: EventWriter<SoundEffect>,
 ) {
-    let Some(stdb) = stdb else {
-        return;
-    };
-
     for (interaction, color_button) in interaction_query.iter() {
         if *interaction == Interaction::Pressed {
+            sound_events.write(SoundEffect::ButtonClick);
+            let Some(stdb) = &stdb else { continue };
             if let Err(e) = stdb.reducers().set_color(color_button.0) {
                 eprintln!("Failed to set color: {}", e);
             }
@@ -345,9 +372,11 @@ fn handle_continue_button(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
     username_state: Res<UsernameInputState>,
     mut next_state: ResMut<NextState<AppState>>,
+    mut sound_events: EventWriter<SoundEffect>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
+            sound_events.write(SoundEffect::ButtonClick);
             // Set username on server if connected
             if let Some(stdb) = &stdb {
                 if !username_state.value.is_empty() {
@@ -357,6 +386,20 @@ fn handle_continue_button(
                 }
             }
             next_state.set(AppState::InGame);
+        }
+    }
+}
+
+/// Handle back button click to return to main menu
+fn handle_color_select_back_button(
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<ColorSelectBackButton>)>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut sound_events: EventWriter<SoundEffect>,
+) {
+    for interaction in &interaction_query {
+        if *interaction == Interaction::Pressed {
+            sound_events.write(SoundEffect::ButtonClick);
+            next_state.set(AppState::MainMenu);
         }
     }
 }

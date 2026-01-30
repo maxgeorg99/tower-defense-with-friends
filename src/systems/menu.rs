@@ -1,4 +1,5 @@
 use crate::resources::AppState;
+use crate::systems::SoundEffect;
 use bevy::prelude::*;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -343,15 +344,17 @@ fn button_interaction<M: Component>(
     mut next_state: ResMut<NextState<AppState>>,
     mut exit: EventWriter<AppExit>,
     mut login_event: EventWriter<LoginRequestEvent>,
+    mut sound_events: EventWriter<SoundEffect>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
+            sound_events.write(SoundEffect::ButtonClick);
             if std::any::type_name::<M>().contains("PlayButton") {
                 next_state.set(AppState::ColorSelect);
             } else if std::any::type_name::<M>().contains("QuitButton") {
                 exit.write(AppExit::Success);
             } else if std::any::type_name::<M>().contains("SettingsButton") {
-                info!("Settings pressed");
+                next_state.set(AppState::Settings);
             } else if std::any::type_name::<M>().contains("LoginButton") {
                 login_event.write(LoginRequestEvent);
             }

@@ -32,7 +32,14 @@ serde = { version = "1.0", features = ["derive"] }
 futures = "0.3"
 
 # Bevy demo dependencies
-bevy = { version = "0.17", optional = true }
+bevy = { version = "0.17", optional = true, default-features = false, features = [
+    "std", "bevy_asset", "bevy_color", "bevy_core_pipeline", "bevy_gilrs", "bevy_gizmos",
+    "bevy_input_focus", "bevy_log", "bevy_mesh_picking_backend", "bevy_pbr", "bevy_picking",
+    "bevy_render", "bevy_sprite", "bevy_sprite_picking_backend", "bevy_state", "bevy_text",
+    "bevy_ui", "bevy_ui_picking_backend", "bevy_winit", "default_font", "hdr", "multi_threaded",
+    "png", "smaa_luts", "sysinfo_plugin", "tonemapping_luts", "vorbis", "webgl2", "x11"
+] }
+bevy_kira_audio = { version = "0.24", optional = true, features = ["mp3", "ogg"] }
 # Local vendored copy with WASM fixes
 bevy_spacetimedb = { path = "bevy_spacetimedb", optional = true }
 spacetimedb-sdk = { git = "https://github.com/kistz/SpacetimeDB", branch = "rust-web-sdk-updated", features = ["web"], optional = true, default-features = false }
@@ -60,10 +67,10 @@ serde_json = { version = "1.0", optional = true }
 [features]
 default = []
 devtools = ["dioxus-devtools"]
-bevy-demo = ["bevy", "bevy_spacetimedb", "spacetimedb-sdk", "dioxus-devtools", "notify", "tiny_http", "open", "url", "log", "sha2", "base64", "rand", "ureq", "serde_json", "ratatui", "ratatui-image", "crossterm", "bevy_ecs_tiled", "tiled"]
+bevy-demo = ["bevy", "bevy_kira_audio", "bevy_spacetimedb", "spacetimedb-sdk", "dioxus-devtools", "notify", "tiny_http", "open", "url", "log", "sha2", "base64", "rand", "ureq", "serde_json", "ratatui", "ratatui-image", "crossterm", "bevy_ecs_tiled", "tiled"]
 bevy-hotpatch = ["bevy-demo", "bevy/hotpatching"]
 # WASM build - excludes native-only deps (notify, tiny_http, open, ureq), uses WASM-compatible bevy_spacetimedb fork
-bevy-wasm = ["bevy", "bevy_spacetimedb", "spacetimedb-sdk", "url", "log", "sha2", "base64", "rand", "serde_json", "getrandom", "wasm-bindgen-futures", "tiled"]
+bevy-wasm = ["bevy", "bevy_kira_audio", "bevy_spacetimedb", "spacetimedb-sdk", "url", "log", "sha2", "base64", "rand", "serde_json", "getrandom", "wasm-bindgen-futures", "tiled"]
 
 # Patches for WASM compatibility
 [patch.crates-io]

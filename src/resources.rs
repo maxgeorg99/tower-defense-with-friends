@@ -39,12 +39,26 @@ pub enum AppState {
     /// Main Menu
     #[default]
     MainMenu,
+    /// Settings screen
+    Settings,
     /// Color and username selection screen
     ColorSelect,
     /// Main game
     InGame,
     /// Game over screen
     GameOver,
+}
+
+/// Global volume setting (0.0 to 1.0)
+#[derive(Resource)]
+pub struct AudioVolume {
+    pub master: f32,
+}
+
+impl Default for AudioVolume {
+    fn default() -> Self {
+        Self { master: 0.5 }
+    }
 }
 
 #[derive(Resource)]

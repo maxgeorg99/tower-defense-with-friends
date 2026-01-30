@@ -11,7 +11,7 @@ use crate::constants::SCALED_TILE_SIZE;
 use crate::map::tile_to_world;
 use crate::module_bindings::{Color as PlayerColor, DbConnection, MyUserTableAccess};
 use crate::resources::{GameState, HouseMenuState, RecruitMenuState, TowerUpgradeMenuState, TowerWheelState};
-use crate::systems::AnimationInfo;
+use crate::systems::{AnimationInfo, SoundEffect};
 
 /// Type alias for cleaner SpacetimeDB resource access
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
@@ -302,6 +302,7 @@ pub fn worker_arrive_check(
     mut game_state: ResMut<GameState>,
     buildings: Query<&Transform, With<WorkerBuilding>>,
     mut workers: Query<(Entity, &Transform, &mut WorkerState, &WorkerTarget, &mut Worker)>,
+    mut sound_events: EventWriter<SoundEffect>,
 ) {
     for (worker_entity, worker_transform, mut state, target, mut worker) in workers.iter_mut() {
         let worker_pos = worker_transform.translation.truncate();
@@ -327,11 +328,15 @@ pub fn worker_arrive_check(
 
                     if dist_to_building < ARRIVAL_DISTANCE {
                         // Deposit resource and go idle
+                        let had_resource = worker.current_resource.is_some();
                         match worker.current_resource {
                             Some(ResourceType::Wood) => game_state.wood += 1,
                             Some(ResourceType::Gold) => game_state.gold += 5,
                             Some(ResourceType::Meat) => game_state.meat += 1,
                             None => {}
+                        }
+                        if had_resource {
+                            sound_events.write(SoundEffect::Reward);
                         }
                         worker.current_resource = None;
                         commands.entity(worker_entity).remove::<WorkerTarget>();
@@ -421,11 +426,22 @@ pub fn worker_sprite_update(
     asset_server: Res<AssetServer>,
     mut workers: Query<(&WorkerState, &Worker, &mut Sprite, &mut AnimationInfo), Changed<WorkerState>>,
     stdb: Option<SpacetimeDB>,
+    mut sound_events: EventWriter<SoundEffect>,
 ) {
     let color = get_player_color(&stdb);
     let color_dir = get_color_dir(color);
 
     for (state, worker, mut sprite, mut anim_info) in workers.iter_mut() {
+        // Play harvesting sounds when entering Harvesting state
+        if *state == WorkerState::Harvesting {
+            match worker.current_resource {
+                Some(ResourceType::Wood) => { sound_events.write(SoundEffect::AxeHit); }
+                Some(ResourceType::Gold) => { sound_events.write(SoundEffect::PickaxeHit); }
+                Some(ResourceType::Meat) => { sound_events.write(SoundEffect::SheepHarvest); }
+                None => {}
+            }
+        }
+
         // Returns (sprite_name, frame_count)
         let (sprite_name, frame_count) = match (state, worker.current_resource) {
             (WorkerState::Idle, _) => ("Pawn_Idle.png", 8),
@@ -666,9 +682,11 @@ pub fn handle_build_worker(
     menu_entities: Query<Entity, With<HouseMenu>>,
     mut buildings: Query<(Entity, &mut WorkerBuilding, &Transform)>,
     stdb: Option<SpacetimeDB>,
+    mut sound_events: EventWriter<SoundEffect>,
 ) {
     for (interaction, option) in interaction_query.iter_mut() {
         if *interaction == Interaction::Pressed {
+            sound_events.write(SoundEffect::ButtonClick);
             if game_state.gold >= option.gold_cost {
                 game_state.gold -= option.gold_cost;
 

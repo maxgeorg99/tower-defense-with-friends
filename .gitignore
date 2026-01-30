@@ -1,5 +1,6 @@
 .idea
 Cargo.lock
+dist/
 target/
 src/module_bindings/
 **/CLAUDE.md
