@@ -12,13 +12,17 @@ pub struct SettingsScreen;
 #[derive(Component)]
 pub struct SettingsBackButton;
 
-/// Marker for the volume slider track
+/// Marker for volume decrease button
 #[derive(Component)]
-pub struct VolumeSliderTrack;
+pub struct VolumeDownButton;
 
-/// Marker for the volume slider handle
+/// Marker for volume increase button
 #[derive(Component)]
-pub struct VolumeSliderHandle;
+pub struct VolumeUpButton;
+
+/// Marker for the volume bar (visual fill)
+#[derive(Component)]
+pub struct VolumeBar;
 
 /// Marker for the volume percentage text
 #[derive(Component)]
@@ -33,9 +37,8 @@ impl Plugin for SettingsPlugin {
             .add_systems(
                 Update,
                 (
-                    handle_back_button,
-                    handle_volume_slider,
-                    update_volume_text,
+                    handle_settings_buttons,
+                    update_volume_display,
                 )
                     .run_if(in_state(AppState::Settings)),
             )
@@ -79,7 +82,7 @@ fn setup_settings_screen(
                 .spawn(Node {
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
-                    row_gap: Val::Px(15.0),
+                    row_gap: Val::Px(20.0),
                     ..default()
                 })
                 .with_children(|section| {
@@ -95,15 +98,15 @@ fn setup_settings_screen(
                             row.spawn((
                                 Text::new("Master Volume:"),
                                 TextFont {
-                                    font_size: 24.0,
+                                    font_size: 28.0,
                                     ..default()
                                 },
-                                TextColor(Color::srgb(0.8, 0.85, 0.85)),
+                                TextColor(Color::srgb(0.9, 0.9, 0.9)),
                             ));
                             row.spawn((
                                 Text::new(format!("{}%", (volume.master * 100.0) as i32)),
                                 TextFont {
-                                    font_size: 24.0,
+                                    font_size: 28.0,
                                     ..default()
                                 },
                                 TextColor(Color::srgb(0.4, 0.8, 0.4)),
@@ -111,52 +114,57 @@ fn setup_settings_screen(
                             ));
                         });
 
-                    // Volume slider
+                    // Volume bar (visual only)
                     section
                         .spawn((
                             Node {
                                 width: Val::Px(300.0),
-                                height: Val::Px(30.0),
-                                justify_content: JustifyContent::FlexStart,
-                                align_items: AlignItems::Center,
+                                height: Val::Px(20.0),
                                 ..default()
                             },
-                            BackgroundColor(Color::srgb(0.2, 0.3, 0.35)),
-                            BorderRadius::all(Val::Px(15.0)),
-                            VolumeSliderTrack,
-                            Button,
+                            BackgroundColor(Color::srgb(0.2, 0.25, 0.3)),
+                            BorderRadius::all(Val::Px(10.0)),
                         ))
-                        .with_children(|track| {
-                            // Filled portion
-                            track.spawn((
+                        .with_children(|bar_container| {
+                            bar_container.spawn((
                                 Node {
                                     width: Val::Percent(volume.master * 100.0),
                                     height: Val::Percent(100.0),
-                                    position_type: PositionType::Absolute,
-                                    left: Val::Px(0.0),
                                     ..default()
                                 },
                                 BackgroundColor(Color::srgb(0.3, 0.6, 0.8)),
-                                BorderRadius::all(Val::Px(15.0)),
-                                VolumeSliderHandle,
+                                BorderRadius::all(Val::Px(10.0)),
+                                VolumeBar,
                             ));
                         });
-                });
-        });
 
-    // Back button in bottom-right corner (like login button)
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                bottom: Val::Px(50.0),
-                right: Val::Px(50.0),
-                ..default()
-            },
-            GlobalZIndex(10),
-            SettingsScreen,
-        ))
-        .with_children(|parent| {
+                    // Volume control buttons row
+                    section
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            align_items: AlignItems::Center,
+                            column_gap: Val::Px(20.0),
+                            ..default()
+                        })
+                        .with_children(|row| {
+                            spawn_nine_slice_button(
+                                row,
+                                &asset_server,
+                                ButtonStyle::SmallRedSquare,
+                                "- VOL",
+                                VolumeDownButton,
+                            );
+                            spawn_nine_slice_button(
+                                row,
+                                &asset_server,
+                                ButtonStyle::SmallBlueSquare,
+                                "+ VOL",
+                                VolumeUpButton,
+                            );
+                        });
+                });
+
+            // Back button
             spawn_nine_slice_button(
                 parent,
                 &asset_server,
@@ -167,64 +175,50 @@ fn setup_settings_screen(
         });
 }
 
-fn handle_back_button(
-    interaction_query: Query<&Interaction, (Changed<Interaction>, With<SettingsBackButton>)>,
+fn handle_settings_buttons(
+    back_query: Query<&Interaction, (Changed<Interaction>, With<SettingsBackButton>)>,
+    down_query: Query<&Interaction, (Changed<Interaction>, With<VolumeDownButton>)>,
+    up_query: Query<&Interaction, (Changed<Interaction>, With<VolumeUpButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
+    mut volume: ResMut<AudioVolume>,
     mut sound_events: EventWriter<SoundEffect>,
 ) {
-    for interaction in &interaction_query {
+    // Handle back button
+    for interaction in &back_query {
         if *interaction == Interaction::Pressed {
             sound_events.write(SoundEffect::ButtonClick);
             next_state.set(AppState::MainMenu);
         }
     }
-}
 
-fn handle_volume_slider(
-    interaction_query: Query<(&Interaction, &ComputedNode, &GlobalTransform), With<VolumeSliderTrack>>,
-    mut volume: ResMut<AudioVolume>,
-    windows: Query<&Window>,
-    mouse_button: Res<ButtonInput<MouseButton>>,
-    mut handle_query: Query<&mut Node, (With<VolumeSliderHandle>, Without<VolumeSliderTrack>)>,
-) {
-    let Ok(window) = windows.single() else {
-        return;
-    };
-    let Some(cursor_pos) = window.cursor_position() else {
-        return;
-    };
+    // Handle volume down
+    for interaction in &down_query {
+        if *interaction == Interaction::Pressed {
+            volume.master = (volume.master - 0.1).max(0.0);
+            sound_events.write(SoundEffect::ButtonClick);
+        }
+    }
 
-    for (interaction, computed_node, transform) in &interaction_query {
-        // Only process when clicking/dragging on the slider
-        if *interaction == Interaction::Pressed
-            || (*interaction == Interaction::Hovered && mouse_button.pressed(MouseButton::Left))
-        {
-            // Get the slider's actual computed size
-            let slider_size = computed_node.size();
-            let slider_width = slider_size.x;
-
-            // GlobalTransform gives the center of the node in screen coordinates
-            let slider_center_x = transform.translation().x;
-            let slider_left = slider_center_x - slider_width / 2.0;
-
-            // Calculate relative position within the slider (0.0 to 1.0)
-            let relative_x = cursor_pos.x - slider_left;
-            let new_volume = (relative_x / slider_width).clamp(0.0, 1.0);
-
-            volume.master = new_volume;
-
-            // Update the handle width
-            for mut handle_node in &mut handle_query {
-                handle_node.width = Val::Percent(new_volume * 100.0);
-            }
+    // Handle volume up
+    for interaction in &up_query {
+        if *interaction == Interaction::Pressed {
+            volume.master = (volume.master + 0.1).min(1.0);
+            sound_events.write(SoundEffect::ButtonClick);
         }
     }
 }
 
-fn update_volume_text(volume: Res<AudioVolume>, mut text_query: Query<&mut Text, With<VolumeText>>) {
+fn update_volume_display(
+    volume: Res<AudioVolume>,
+    mut text_query: Query<&mut Text, With<VolumeText>>,
+    mut bar_query: Query<&mut Node, With<VolumeBar>>,
+) {
     if volume.is_changed() {
         for mut text in &mut text_query {
             text.0 = format!("{}%", (volume.master * 100.0) as i32);
+        }
+        for mut bar in &mut bar_query {
+            bar.width = Val::Percent(volume.master * 100.0);
         }
     }
 }
