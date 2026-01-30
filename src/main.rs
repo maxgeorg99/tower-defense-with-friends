@@ -28,7 +28,7 @@ use auth::{
     start_login,
 };
 use bevy::BevyPlugin;
-use bevy_kira_audio::AudioPlugin;
+use bevy_kira_audio::{AudioApp, AudioPlugin};
 #[cfg(all(feature = "bevy-demo", not(target_arch = "wasm32")))]
 use debug::DebugPlugin;
 use events::EventPlugin;
@@ -113,6 +113,7 @@ fn main() {
 
     app.add_plugins(BevyPlugin)
         .add_plugins(AudioPlugin)
+        .add_audio_channel::<MusicChannel>()
         .add_plugins(EventPlugin)
         .add_plugins(MenuPlugin)
         .add_plugins(SettingsPlugin)
@@ -179,7 +180,7 @@ fn main() {
     #[cfg(target_arch = "wasm32")]
     app.add_systems(Update, process_stdb_messages);
 
-    app.add_systems(Update, start_background_music)
+    app.add_systems(Update, (start_background_music, update_background_music_volume))
         .add_systems(OnEnter(AppState::ColorSelect), connect_to_spacetimedb)
         .add_systems(
             OnEnter(AppState::InGame),

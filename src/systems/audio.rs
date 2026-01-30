@@ -58,29 +58,50 @@ pub fn load_sound_assets(mut commands: Commands, asset_server: Res<AssetServer>)
     });
 }
 
-/// Marker to track if background music has started
-#[derive(Resource, Default)]
-pub struct BackgroundMusicStarted;
+/// Audio channel for background music
+#[derive(Resource)]
+pub struct MusicChannel;
+
+/// Store the background music instance handle for direct control
+#[derive(Resource)]
+pub struct BackgroundMusicHandle(pub Handle<AudioInstance>);
 
 /// Start playing background music once assets are loaded
 pub fn start_background_music(
     mut commands: Commands,
     sounds: Option<Res<SoundAssets>>,
-    audio: Res<Audio>,
+    music: Res<AudioChannel<MusicChannel>>,
     volume: Res<AudioVolume>,
-    started: Option<Res<BackgroundMusicStarted>>,
+    existing: Option<Res<BackgroundMusicHandle>>,
 ) {
-    if started.is_some() {
+    if existing.is_some() {
         return;
     }
     let Some(sounds) = sounds else { return };
 
-    audio
+    let handle = music
         .play(sounds.background_music.clone())
         .looped()
-        .with_volume(amplitude_to_db(volume.master));
+        .with_volume(amplitude_to_db(volume.master))
+        .handle();
 
-    commands.insert_resource(BackgroundMusicStarted);
+    commands.insert_resource(BackgroundMusicHandle(handle));
+}
+
+/// Update background music volume when AudioVolume changes
+pub fn update_background_music_volume(
+    volume: Res<AudioVolume>,
+    handle: Option<Res<BackgroundMusicHandle>>,
+    mut audio_instances: ResMut<Assets<AudioInstance>>,
+) {
+    if !volume.is_changed() {
+        return;
+    }
+    let Some(handle) = handle else { return };
+
+    if let Some(instance) = audio_instances.get_mut(&handle.0) {
+        instance.set_decibels(amplitude_to_db(volume.master), default());
+    }
 }
 
 /// System that plays sound effects when events are received
