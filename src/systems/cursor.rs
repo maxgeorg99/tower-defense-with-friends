@@ -8,6 +8,7 @@ pub struct CursorPlugin;
 impl Plugin for CursorPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CursorHandles>()
+            .init_resource::<CurrentCursorState>()
             .add_systems(Startup, setup_custom_cursor)
             .add_systems(Update, update_cursor_for_tile.run_if(in_state(AppState::InGame)));
     }
@@ -17,6 +18,13 @@ impl Plugin for CursorPlugin {
 struct CursorHandles {
     normal: Handle<Image>,
     blocked: Handle<Image>,
+}
+
+#[derive(Resource, Default, PartialEq)]
+enum CurrentCursorState {
+    #[default]
+    Normal,
+    Blocked,
 }
 
 fn setup_custom_cursor(
@@ -32,7 +40,7 @@ fn setup_custom_cursor(
         commands.entity(window_entity).insert(
             CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
                 handle: cursor_handles.normal.clone(),
-                hotspot: (0, 0),
+                hotspot: (24, 20),
                 ..default()
             }))
         );
@@ -45,8 +53,32 @@ fn update_cursor_for_tile(
     windows: Query<(Entity, &Window)>,
     camera: Query<(&Camera, &GlobalTransform)>,
     blocked_tiles: Res<BlockedTiles>,
+    mut current_state: ResMut<CurrentCursorState>,
+    interaction_query: Query<&Interaction>,
 ) {
     let Ok((camera, camera_transform)) = camera.single() else { return };
+
+    // Check if cursor is over any UI element
+    let is_over_ui = interaction_query.iter().any(|interaction| {
+        matches!(interaction, Interaction::Hovered | Interaction::Pressed)
+    });
+
+    // If over UI, always use normal cursor
+    if is_over_ui {
+        if *current_state != CurrentCursorState::Normal {
+            for (window_entity, _) in windows.iter() {
+                commands.entity(window_entity).insert(
+                    CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
+                        handle: cursor_handles.normal.clone(),
+                        hotspot: (24, 20),
+                        ..default()
+                    }))
+                );
+            }
+            *current_state = CurrentCursorState::Normal;
+        }
+        return;
+    }
 
     for (window_entity, window) in windows.iter() {
         let Some(cursor_pos) = window.cursor_position() else { continue };
@@ -54,19 +86,29 @@ fn update_cursor_for_tile(
 
         let (tile_x, tile_y) = world_to_tile(world_pos);
 
-        // Use blocked cursor on road tiles (but not castle)
-        let cursor_handle = if blocked_tiles.is_road(tile_x, tile_y) {
-            cursor_handles.blocked.clone()
+        // Determine desired cursor state
+        let desired_state = if blocked_tiles.is_road(tile_x, tile_y) {
+            CurrentCursorState::Blocked
         } else {
-            cursor_handles.normal.clone()
+            CurrentCursorState::Normal
         };
 
-        commands.entity(window_entity).insert(
-            CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
-                handle: cursor_handle,
-                hotspot: (0, 0),
-                ..default()
-            }))
-        );
+        // Only update if state changed
+        if *current_state != desired_state {
+            let (cursor_handle, hotspot) = match desired_state {
+                CurrentCursorState::Blocked => (cursor_handles.blocked.clone(), (32, 29)),
+                CurrentCursorState::Normal => (cursor_handles.normal.clone(), (24, 20)),
+            };
+
+            commands.entity(window_entity).insert(
+                CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
+                    handle: cursor_handle,
+                    hotspot,
+                    ..default()
+                }))
+            );
+
+            *current_state = desired_state;
+        }
     }
 }
