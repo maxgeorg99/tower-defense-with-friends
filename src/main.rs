@@ -231,6 +231,7 @@ fn main() {
                 on_enemy_component_updated,
                 on_projectile_component_inserted,
                 update_online_users_ui,
+                animate_dust_effects,
             ),
         )
         .add_systems(

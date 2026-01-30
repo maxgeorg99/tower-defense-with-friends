@@ -121,7 +121,6 @@ pub fn update_wave_panel(
 }
 
 /// Spawns the complete wave banner with all enemy information
-/// Spawns the complete wave banner with all enemy information
 fn spawn_wave_banner(
     parent: &mut ChildSpawnerCommands,
     wave: &Wave,
@@ -163,6 +162,7 @@ fn spawn_wave_banner(
                     row_gap: Val::Px(12.0),
                     width: Val::Percent(100.0),
                     align_items: AlignItems::Center,
+                    padding: UiRect::top(Val::Px(5.0)),
                     ..default()
                 })
                 .with_children(|content| {
@@ -186,6 +186,12 @@ fn spawn_wave_banner(
                             spawn_enemy_row(content, unit, spawn, asset_server);
                         }
                     }
+                    //dynamic padding for long lists
+                    content.spawn(Node {
+                        height: Val::Px(6.0 * wave.spawns.len() as f32),
+                        width: Val::Percent(100.0),
+                        ..default()
+                    });
                 });
         });
 }

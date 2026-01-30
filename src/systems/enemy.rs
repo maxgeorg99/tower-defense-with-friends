@@ -10,6 +10,56 @@ pub struct AnimationInfo {
     pub frame_count: usize,
 }
 
+#[derive(Component)]
+pub struct DustEffect {
+    pub frame_count: usize,
+    pub timer: Timer,
+}
+
+/// Spawn a dust effect at the given position
+fn spawn_dust_effect(
+    commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
+    texture_atlases: &mut ResMut<Assets<TextureAtlasLayout>>,
+    position: Vec2,
+    spawn_interval: f32,
+) {
+    // Choose which dust effect to use (you can randomize this if you want variety)
+    let dust_sprite = "Particle FX/Dust_02.png"; // or "Dust_02.png"
+    let frame_count = 9;
+
+    // Calculate animation speed based on spawn interval
+    // If units spawn quickly, make the dust animation faster
+    let animation_duration = (spawn_interval * 0.8).max(0.3).min(0.8);
+    let frame_time = animation_duration / frame_count as f32;
+
+    let layout = TextureAtlasLayout::from_grid(
+        UVec2::new(64, 64), // Adjust based on your actual frame size
+        frame_count as u32,
+        1,
+        None,
+        None,
+    );
+    let texture_atlas_layout = texture_atlases.add(layout);
+
+    let dust_scale = SCALED_TILE_SIZE / 64.0; // Adjust 32.0 to match your dust frame size
+
+    commands.spawn((
+        Sprite::from_atlas_image(
+            asset_server.load(dust_sprite),
+            TextureAtlas {
+                layout: texture_atlas_layout,
+                index: 0,
+            },
+        ),
+        Transform::from_xyz(position.x, position.y, 0.5) // Z-index 0.5 (below enemies at 1.0)
+            .with_scale(Vec3::splat(dust_scale)),
+        DustEffect {
+            frame_count,
+            timer: Timer::from_seconds(frame_time, TimerMode::Repeating),
+        },
+    ));
+}
 
 // ============================================================================
 // Modified spawn_enemies integration
@@ -73,6 +123,15 @@ pub fn spawn_enemies(
 
                 let enemy_scale = SCALED_TILE_SIZE / frame_width as f32;
 
+                // Spawn dust effect at spawn position
+                spawn_dust_effect(
+                    &mut commands,
+                    &asset_server,
+                    &mut texture_atlases,
+                    start_pos,
+                    wave.spawn_interval,
+                );
+
                 let enemy_entity = commands
                     .spawn((
                         Sprite::from_atlas_image(
@@ -120,6 +179,7 @@ pub fn spawn_enemies(
         }
     }
 }
+
 fn spawn_health_bar(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
@@ -173,6 +233,29 @@ fn spawn_health_bar(
     commands.entity(parent_entity).add_child(health_bar_bg);
 
     health_bar_bg
+}
+
+/// System to animate and cleanup dust effects
+pub fn animate_dust_effects(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut dust_query: Query<(Entity, &mut DustEffect, &mut Sprite)>,
+) {
+    for (entity, mut dust, mut sprite) in dust_query.iter_mut() {
+        dust.timer.tick(time.delta());
+
+        if dust.timer.just_finished() {
+            // Get the texture atlas from the sprite if it exists
+            if let Some(ref mut atlas) = sprite.texture_atlas {
+                atlas.index += 1;
+
+                // If we've played all frames, despawn the effect
+                if atlas.index >= dust.frame_count {
+                    commands.entity(entity).despawn();
+                }
+            }
+        }
+    }
 }
 
 pub fn move_enemies(
