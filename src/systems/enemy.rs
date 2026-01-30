@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::components::{AnimationTimer, DefenseType, Enemy, HealthBar, HealthBarFill};
-use crate::constants::{SCALED_TILE_SIZE, WARRIOR_FRAME_SIZE};
+use crate::constants::SCALED_TILE_SIZE;
 use crate::resources::{EnemySpawner, GameState, PathWaypoints, WaveConfigs};
 use crate::systems::{SoundEffect, WaveManager};
 
@@ -264,7 +264,7 @@ pub fn move_enemies(
     time: Res<Time>,
     mut game_state: ResMut<GameState>,
     waypoints: Res<PathWaypoints>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     for (entity, mut transform, mut enemy, children) in enemies.iter_mut() {
         // Get current and next waypoint

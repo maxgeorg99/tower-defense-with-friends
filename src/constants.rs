@@ -7,7 +7,6 @@ pub const SCALED_TILE_SIZE: f32 = TILE_SIZE * MAP_SCALE; // 32 pixels
 
 // Asset dimensions
 pub const TOWER_SIZE: Vec2 = Vec2::new(128.0, 256.0);
-pub const WARRIOR_FRAME_SIZE: Vec2 = Vec2::new(192.0, 192.0); // Single frame from sprite sheet
 pub const ARROW_SIZE: Vec2 = Vec2::new(64.0, 64.0);
 pub const CASTLE_SIZE: Vec2 = Vec2::new(320.0, 256.0);
 

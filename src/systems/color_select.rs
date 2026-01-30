@@ -263,7 +263,7 @@ fn spawn_color_button(
 pub fn handle_color_button_click(
     stdb: Option<SpacetimeDB>,
     interaction_query: Query<(&Interaction, &ColorButton), (Changed<Interaction>, With<Button>)>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut sound_events: MessageWriter<SoundEffect>,
     mut selected_color: ResMut<crate::resources::SelectedColor>,
 ) {
     for (interaction, color_button) in interaction_query.iter() {
@@ -376,7 +376,7 @@ fn handle_continue_button(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
     username_state: Res<UsernameInputState>,
     mut next_state: ResMut<NextState<AppState>>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
@@ -398,7 +398,7 @@ fn handle_continue_button(
 fn handle_color_select_back_button(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<ColorSelectBackButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {

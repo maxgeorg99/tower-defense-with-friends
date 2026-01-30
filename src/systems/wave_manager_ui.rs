@@ -1,11 +1,10 @@
 use bevy::prelude::*;
 use bevy_spacetimedb::StdbConnection;
-use crate::components::{get_defense_type_icon, AnimationTimer, DefenseType, Enemy};
-use crate::config::{UnitSpawn, UnitType, UnitsConfig, Wave, WavesConfig};
+use crate::components::{get_defense_type_icon, DefenseType, Enemy};
+use crate::config::{UnitSpawn, UnitType, Wave};
 use crate::module_bindings::{DbConnection, start_wave as start_wave_reducer};
-use crate::resources::{AppState, EnemySpawner, GameState, PathWaypoints, WaveConfigs};
+use crate::resources::{AppState, EnemySpawner, GameState, WaveConfigs};
 use crate::resources::AppState::InGame;
-use crate::systems::AnimationInfo;
 
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
 // ============================================================================
@@ -125,7 +124,7 @@ fn spawn_wave_banner(
     parent: &mut ChildSpawnerCommands,
     wave: &Wave,
     wave_configs: &WaveConfigs,
-    wave_manager: &WaveManager,
+    _wave_manager: &WaveManager,
     asset_server: &AssetServer,
 ) {
     parent

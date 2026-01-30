@@ -181,7 +181,7 @@ fn handle_settings_buttons(
     up_query: Query<&Interaction, (Changed<Interaction>, With<VolumeUpButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
     mut volume: ResMut<AudioVolume>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     // Handle back button
     for interaction in &back_query {

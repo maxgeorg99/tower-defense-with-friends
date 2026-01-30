@@ -322,7 +322,7 @@ pub fn handle_recruit_selection(
     mut game_state: ResMut<GameState>,
     mut menu_state: ResMut<RecruitMenuState>,
     menu_entities: Query<Entity, With<RecruitMenu>>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     for (interaction, option) in interaction_query.iter_mut() {
         if *interaction == Interaction::Pressed {

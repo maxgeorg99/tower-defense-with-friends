@@ -2,18 +2,18 @@ use bevy::prelude::*;
 use bevy::ecs::prelude::ChildSpawnerCommands;
 use bevy_spacetimedb::StdbConnection;
 use spacetimedb_sdk::Table;
-use crate::components::{get_attack_type_icon, get_damage_multiplier, AttackType, AnimationTimer, Enemy, HolyTowerEffect, Tower, TowerLevel, TowerUpgradeMenu, TowerUpgradeOption, TowerWheelMenu, TowerWheelOption, Projectile, UpgradeType, WorkerBuilding};
+use crate::components::{get_attack_type_icon, get_damage_multiplier, AttackType, AnimationTimer, Enemy, ExplosionEffect, HolyTowerEffect, RangeIndicator, Tower, TowerLevel, TowerSellButton, TowerUpgradeMenu, TowerUpgradeOption, TowerWheelMenu, TowerWheelOption, Projectile, UpgradeType, WorkerBuilding};
 use crate::systems::{AnimationInfo, SoundEffect};
 use crate::config::TowerType;
 use crate::constants::{ARROW_SIZE, EXPLORE_COST, EXPLORE_RADIUS, SCALED_TILE_SIZE, TOWER_SIZE};
 use crate::map::world_to_tile;
 use crate::module_bindings;
 use crate::module_bindings::{
-    DbConnection, MyUserTableAccess, UserTableAccess,
+    DbConnection, MyUserTableAccess,
     place_tower, upgrade_tower_damage, upgrade_tower_range, upgrade_tower_fire_rate
 };
 use crate::systems::entity_sync::EntityMap;
-use crate::resources::{BlockedTiles, FogOfWar, GameState, HouseMenuState, RecruitMenuState, TowerConfigs, TowerUpgradeMenuState, TowerWheelState};
+use crate::resources::{BlockedTiles, FogOfWar, GameState, HouseMenuState, RecruitMenuState, SelectedColor, TowerConfigs, TowerUpgradeMenuState, TowerWheelState};
 
 //TODO Display for generated Types?!
 impl module_bindings::Color {
@@ -33,7 +33,7 @@ pub fn spawn_tower(
     asset_server: &Res<AssetServer>,
     position: Vec3,
     tower_type: &TowerType,
-    stdb: Option<SpacetimeDB>,
+    color: module_bindings::Color,
 ) {
     // Tower is 128x256, we want it to fit exactly 1 tile (32x32 when scaled)
     // Scale factor = desired_size / actual_size
@@ -41,7 +41,7 @@ pub fn spawn_tower(
     let scale_y = SCALED_TILE_SIZE / TOWER_SIZE.y; // 32 / 256 = 0.125
     let scale = scale_x.min(scale_y); // Use smaller to fit within 1 tile
 
-    let path = get_tower_sprite_path(tower_type, stdb.as_ref());
+    let path = tower_type.sprite_path.replace("Blue", color.as_str());
     commands.spawn((
         Sprite::from_image(asset_server.load(path)),
         Transform::from_translation(position).with_scale(Vec3::splat(scale)),
@@ -271,11 +271,11 @@ pub fn show_tower_wheel_menu(
                     }
                 }
 
-                // Add center indicator
+                // Add center build icon indicator
                 commands.spawn((
                     Sprite {
-                        color: Color::srgba(1.0, 1.0, 1.0, 0.5),
-                        custom_size: Some(Vec2::splat(10.0)),
+                        image: asset_server.load("UI Elements/UI Elements/Icons/Build_Icon.png"),
+                        custom_size: Some(Vec2::splat(24.0)),
                         ..default()
                     },
                     Transform::from_xyz(world_pos.x, world_pos.y, 10.0),
@@ -321,6 +321,7 @@ pub fn handle_tower_selection(
     menu_options: Query<(&Transform, &TowerWheelOption), With<TowerWheelMenu>>,
     menu_entities: Query<Entity, With<TowerWheelMenu>>,
     stdb: Option<SpacetimeDB>,
+    selected_color: Res<SelectedColor>,
 ) {
     if mouse_button.just_released(MouseButton::Left) && wheel_state.active {
         let Ok(window) = windows.single() else { return };
@@ -371,28 +372,22 @@ pub fn handle_tower_selection(
                         let (tile_x, tile_y) = world_to_tile(Vec2::new(snapped_x, snapped_y));
                         let is_explored = fog.is_explored(tile_x, tile_y);
 
-                        // Only attempt placement if tile is explored and we might have gold
-                        // Server will validate gold and handle deduction
+                        // Only attempt placement if tile is explored and we have enough gold
                         if game_state.gold >= tower_type.cost && is_explored {
+                            // Always spawn tower locally for immediate visual feedback
+                            let snapped_pos = Vec3::new(snapped_x, snapped_y, 1.0);
+                            spawn_tower(&mut commands, &asset_server, snapped_pos, tower_type, selected_color.0);
+                            game_state.gold -= tower_type.cost;
+
+                            // Also notify server if connected (for multiplayer sync)
                             if let Some(ref stdb) = stdb {
-                                // Call the server reducer to place tower
-                                // Server will validate gold, deduct it, and create entities
-                                // Entity sync will spawn the visual representation
                                 if let Err(e) = stdb.conn().reducers.place_tower(
                                     tower_type.id.clone(),
                                     snapped_x,
                                     snapped_y,
                                 ) {
-                                    error!("Failed to place tower: {:?}", e);
-                                } else {
-                                    info!("Tower placement requested: {} at ({}, {})",
-                                        tower_type.id, snapped_x, snapped_y);
+                                    warn!("Failed to sync tower with server: {:?}", e);
                                 }
-                            } else {
-                                // Fallback for offline/non-networked mode - spawn locally
-                                let snapped_pos = Vec3::new(snapped_x, snapped_y, 1.0);
-                                spawn_tower(&mut commands, &asset_server, snapped_pos, tower_type, None);
-                                game_state.gold -= tower_type.cost;
                             }
                         }
                     }
@@ -425,8 +420,8 @@ pub fn tower_shooting(
     mut enemies: Query<(Entity, &Transform, &mut Enemy), Without<Tower>>,
     mut game_state: ResMut<GameState>,
     time: Res<Time>,
-    stdb: Option<SpacetimeDB>,
-    mut sound_events: EventWriter<SoundEffect>,
+    _stdb: Option<SpacetimeDB>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     for (tower_transform, mut tower) in towers.iter_mut() {
         tower.cooldown -= time.delta_secs();
@@ -468,6 +463,7 @@ pub fn tower_shooting(
                             &mut texture_atlases,
                             enemy_transform.translation,
                         );
+                        sound_events.write(SoundEffect::HolyAttack);
 
                         // Check if enemy died from instant damage
                         if enemy.health <= 0.0 {
@@ -490,7 +486,12 @@ pub fn tower_shooting(
                             attack_type: tower.attack_type,
                         },
                     ));
-                    sound_events.write(SoundEffect::ArrowShoot);
+                    // Play appropriate sound based on tower type
+                    if tower.tower_type_id == "catapult" {
+                        sound_events.write(SoundEffect::StoneAttack);
+                    } else {
+                        sound_events.write(SoundEffect::ArrowShoot);
+                    }
                 }
 
                 tower.cooldown = tower.fire_rate;
@@ -552,7 +553,7 @@ pub fn update_holy_tower_effects(
     for (entity, mut effect) in effects.iter_mut() {
         effect.lifetime.tick(time.delta());
 
-        if effect.lifetime.finished() {
+        if effect.lifetime.is_finished() {
             commands.queue_silenced(move |world: &mut World| {
                 if let Ok(entity_mut) = world.get_entity_mut(entity) {
                     entity_mut.despawn();
@@ -592,6 +593,7 @@ pub fn show_tower_upgrade_menu(
     house_menu_state: Res<HouseMenuState>,
     towers: Query<(Entity, &Transform, &Tower, &TowerLevel)>,
     existing_menus: Query<Entity, With<TowerUpgradeMenu>>,
+    tower_configs: Res<TowerConfigs>,
 ) {
     // Don't show if any other menu is active
     if !mouse_button.just_pressed(MouseButton::Left)
@@ -617,9 +619,17 @@ pub fn show_tower_upgrade_menu(
                 commands.entity(entity).despawn();
             }
 
+            // Find the tower's original cost for sell value calculation
+            let tower_cost = tower_configs
+                .towers
+                .iter()
+                .find(|t| t.id == tower.tower_type_id)
+                .map(|t| t.cost)
+                .unwrap_or(100);
+
             upgrade_menu_state.active = true;
             upgrade_menu_state.selected_tower = Some(tower_entity);
-            spawn_tower_upgrade_menu(&mut commands, &asset_server, tower, tower_level);
+            spawn_tower_upgrade_menu(&mut commands, &asset_server, tower, tower_level, tower_cost);
             return;
         }
     }
@@ -630,8 +640,11 @@ fn spawn_tower_upgrade_menu(
     asset_server: &Res<AssetServer>,
     tower: &Tower,
     tower_level: &TowerLevel,
+    tower_cost: i32,
 ) {
     let wood_icon = asset_server.load("Terrain/Resources/Wood/Wood Resource/Wood Resource.png");
+    let gold_icon = asset_server.load("UI Elements/UI Elements/Icons/Gold_Icon.png");
+    let sell_value = tower_cost / 2;
 
     // Main menu container (centered overlay)
     commands
@@ -724,6 +737,50 @@ fn spawn_tower_upgrade_menu(
                                 UpgradeType::FireRate,
                                 UPGRADE_FIRE_RATE_COST,
                             );
+                        });
+
+                    // Sell button
+                    panel
+                        .spawn((
+                            Node {
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                padding: UiRect::axes(Val::Px(20.0), Val::Px(10.0)),
+                                column_gap: Val::Px(8.0),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.6, 0.2, 0.2, 0.9)),
+                            BorderRadius::all(Val::Px(6.0)),
+                            TowerSellButton { gold_refund: sell_value },
+                            Button,
+                        ))
+                        .with_children(|sell_btn: &mut ChildSpawnerCommands| {
+                            sell_btn.spawn((
+                                Text::new("SELL"),
+                                TextFont {
+                                    font_size: 14.0,
+                                    ..default()
+                                },
+                                TextColor(Color::WHITE),
+                            ));
+
+                            sell_btn.spawn((
+                                Text::new(format!("+{}", sell_value)),
+                                TextFont {
+                                    font_size: 14.0,
+                                    ..default()
+                                },
+                                TextColor(Color::srgb(1.0, 0.85, 0.0)),
+                            ));
+
+                            sell_btn.spawn((
+                                ImageNode::new(gold_icon),
+                                Node {
+                                    width: Val::Px(18.0),
+                                    height: Val::Px(18.0),
+                                    ..default()
+                                },
+                            ));
                         });
 
                     // Close hint
@@ -882,7 +939,7 @@ pub fn handle_tower_upgrade(
     menu_entities: Query<Entity, With<TowerUpgradeMenu>>,
     entity_map: Res<EntityMap>,
     stdb: Option<SpacetimeDB>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     for (interaction, option) in interaction_query.iter_mut() {
         if *interaction == Interaction::Pressed {
@@ -932,6 +989,195 @@ pub fn handle_tower_upgrade(
                     option.wood_cost, game_state.wood
                 );
             }
+        }
+    }
+}
+
+// Explosion effect constants (Explosion_02.png is 1920x192 = 10 frames of 192x192)
+const EXPLOSION_FRAME_SIZE: UVec2 = UVec2::new(192, 192);
+const EXPLOSION_FRAME_COUNT: usize = 10;
+
+/// Handle clicking on the sell tower button
+pub fn handle_tower_sell(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
+    mut interaction_query: Query<
+        (&Interaction, &TowerSellButton),
+        (Changed<Interaction>, With<Button>),
+    >,
+    mut game_state: ResMut<GameState>,
+    mut menu_state: ResMut<TowerUpgradeMenuState>,
+    menu_entities: Query<Entity, With<TowerUpgradeMenu>>,
+    towers: Query<&Transform, With<Tower>>,
+    mut sound_events: MessageWriter<SoundEffect>,
+) {
+    for (interaction, sell_button) in interaction_query.iter_mut() {
+        if *interaction == Interaction::Pressed {
+            if let Some(tower_entity) = menu_state.selected_tower {
+                // Get tower position before despawning
+                if let Ok(tower_transform) = towers.get(tower_entity) {
+                    let tower_pos = tower_transform.translation;
+
+                    // Spawn explosion effect
+                    let layout = TextureAtlasLayout::from_grid(
+                        EXPLOSION_FRAME_SIZE,
+                        EXPLOSION_FRAME_COUNT as u32,
+                        1,
+                        None,
+                        None,
+                    );
+                    let explosion_atlas = texture_atlases.add(layout);
+                    let explosion_scale = SCALED_TILE_SIZE * 1.5 / EXPLOSION_FRAME_SIZE.x as f32;
+
+                    commands.spawn((
+                        Sprite::from_atlas_image(
+                            asset_server.load("Particle FX/Explosion_02.png"),
+                            TextureAtlas {
+                                layout: explosion_atlas,
+                                index: 0,
+                            },
+                        ),
+                        Transform::from_xyz(tower_pos.x, tower_pos.y, 5.0)
+                            .with_scale(Vec3::splat(explosion_scale)),
+                        ExplosionEffect {
+                            frame_count: EXPLOSION_FRAME_COUNT,
+                            timer: Timer::from_seconds(0.08, TimerMode::Repeating),
+                        },
+                    ));
+
+                    // Give gold refund
+                    game_state.gold += sell_button.gold_refund;
+
+                    // Play sound
+                    sound_events.write(SoundEffect::TowerDestroy);
+
+                    // Despawn the tower
+                    commands.entity(tower_entity).despawn();
+
+                    info!("Tower sold for {} gold", sell_button.gold_refund);
+                }
+
+                // Close menu
+                for entity in menu_entities.iter() {
+                    commands.entity(entity).despawn();
+                }
+                menu_state.active = false;
+                menu_state.selected_tower = None;
+            }
+        }
+    }
+}
+
+/// Animate and cleanup explosion effects
+pub fn animate_explosion_effects(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut explosions: Query<(Entity, &mut ExplosionEffect, &mut Sprite)>,
+) {
+    for (entity, mut explosion, mut sprite) in explosions.iter_mut() {
+        explosion.timer.tick(time.delta());
+
+        if explosion.timer.just_finished() {
+            if let Some(ref mut atlas) = sprite.texture_atlas {
+                atlas.index += 1;
+
+                if atlas.index >= explosion.frame_count {
+                    commands.entity(entity).despawn();
+                }
+            }
+        }
+    }
+}
+
+// ==================== Range Indicator Systems ====================
+
+/// Show range indicator when hovering over tower options in the wheel menu
+pub fn show_range_indicator(
+    mut commands: Commands,
+    windows: Query<&Window>,
+    camera: Query<(&Camera, &GlobalTransform)>,
+    wheel_state: Res<TowerWheelState>,
+    tower_configs: Res<TowerConfigs>,
+    menu_options: Query<(&Transform, &TowerWheelOption), With<TowerWheelMenu>>,
+    existing_indicators: Query<Entity, With<RangeIndicator>>,
+) {
+    // Clean up existing indicators first
+    for entity in existing_indicators.iter() {
+        commands.entity(entity).despawn();
+    }
+
+    // Only show indicator when wheel menu is active
+    if !wheel_state.active {
+        return;
+    }
+
+    let Ok(window) = windows.single() else { return };
+    let Ok((camera, camera_transform)) = camera.single() else { return };
+    let Some(cursor_pos) = window.cursor_position() else { return };
+    let Ok(mouse_world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_pos) else { return };
+
+    // Check which tower option the mouse is hovering over
+    for (transform, option) in menu_options.iter() {
+        // Skip explore option
+        if option.tower_type_id == "_explore" {
+            continue;
+        }
+
+        let distance = transform.translation.truncate().distance(mouse_world_pos);
+        if distance < 40.0 {
+            // Find the tower's range from config
+            if let Some(tower_type) = tower_configs.towers.iter().find(|t| t.id == option.tower_type_id) {
+                // Spawn range indicator circle at the placement position
+                let indicator_pos = wheel_state.position;
+
+                // Create a semi-transparent circle showing the tower's range (light green)
+                commands.spawn((
+                    Sprite {
+                        color: Color::srgba(0.4, 0.9, 0.4, 0.25),
+                        custom_size: Some(Vec2::splat(tower_type.range * 2.0)),
+                        ..default()
+                    },
+                    Transform::from_xyz(indicator_pos.x, indicator_pos.y, 0.5),
+                    RangeIndicator,
+                ));
+
+                // Also spawn the outline circle
+                commands.spawn((
+                    Sprite {
+                        color: Color::srgba(0.4, 0.9, 0.4, 0.6),
+                        custom_size: Some(Vec2::splat(tower_type.range * 2.0 + 4.0)),
+                        ..default()
+                    },
+                    Transform::from_xyz(indicator_pos.x, indicator_pos.y, 0.49),
+                    RangeIndicator,
+                ));
+
+                // Inner circle (slightly smaller and more transparent for depth)
+                commands.spawn((
+                    Sprite {
+                        color: Color::srgba(0.3, 0.8, 0.3, 0.15),
+                        custom_size: Some(Vec2::splat(tower_type.range * 2.0 - 4.0)),
+                        ..default()
+                    },
+                    Transform::from_xyz(indicator_pos.x, indicator_pos.y, 0.51),
+                    RangeIndicator,
+                ));
+            }
+            break;
+        }
+    }
+}
+
+/// Clean up range indicators when the tower wheel menu is closed
+pub fn cleanup_range_indicator(
+    mut commands: Commands,
+    wheel_state: Res<TowerWheelState>,
+    indicators: Query<Entity, With<RangeIndicator>>,
+) {
+    if !wheel_state.active {
+        for entity in indicators.iter() {
+            commands.entity(entity).despawn();
         }
     }
 }

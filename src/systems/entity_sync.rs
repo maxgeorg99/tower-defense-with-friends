@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 use bevy_spacetimedb::*;
-use spacetimedb_sdk::Table;
 
 use crate::components::{AttackType, DefenseType, Enemy, Projectile, Tower, TowerLevel};
 use crate::constants::SCALED_TILE_SIZE;
@@ -39,6 +38,7 @@ impl EntityMap {
 }
 
 /// Marker component for entities synced from the server
+#[allow(dead_code)]
 #[derive(Component)]
 pub struct ServerEntity {
     pub server_id: u64,

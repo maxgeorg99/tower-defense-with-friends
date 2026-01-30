@@ -21,7 +21,7 @@ impl<
 {
     /// Registers a reducer message <E> for the bevy application.
     pub fn add_reducer<E: RegisterableReducerMessage<C, M> + Send + Sync + 'static>(
-        mut self,
+        self,
     ) -> Self {
         let register_fn = move |app: &mut App, reducers: &C::Reducers| {
             let (send, recv) = channel::<ReducerResultMessage<E>>();

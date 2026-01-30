@@ -1,17 +1,15 @@
 use bevy::prelude::*;
 use bevy::ecs::prelude::ChildSpawnerCommands;
-use bevy_spacetimedb::*;
-use spacetimedb_sdk::Table;
 
 use crate::components::{
     AnimationTimer, BuildWorkerOption, Depleted, HarvestTimer, HouseMenu, ResourceNode,
     ResourceType, Worker, WorkerBuilding, WorkerState, WorkerTarget,
 };
 use crate::constants::SCALED_TILE_SIZE;
-use crate::map::tile_to_world;
+use crate::map::{create_blocked_tiles, tile_to_world};
 use crate::module_bindings::Color as PlayerColor;
 use crate::resources::{GameState, HouseMenuState, RecruitMenuState, SelectedColor, TowerUpgradeMenuState, TowerWheelState};
-use crate::systems::{AnimationInfo, SoundEffect};
+use crate::systems::{AnimationInfo, DustEffect, SoundEffect};
 
 const PAWN_FRAME_SIZE: UVec2 = UVec2::new(192, 192);
 const WORKER_SPEED: f32 = 30.0;
@@ -62,7 +60,41 @@ pub fn setup_resource_gathering(
 
     const TREE_FRAME_SIZE: UVec2 = UVec2::new(192, 256);
     let tree_scale = SCALED_TILE_SIZE / TREE_FRAME_SIZE.x as f32;
-    let tree_positions = [(22, 15), (22, 14), (21, 16)];
+
+    // Get blocked tiles (road and castle) to avoid placing trees there
+    let (blocked_tiles, _) = create_blocked_tiles();
+
+    // Tree positions distributed across the map, avoiding the road path
+    // Original cluster near worker building
+    let mut tree_positions: Vec<(i32, i32)> = vec![
+        (22, 15), (22, 14), (21, 16),
+    ];
+
+    // Additional tree clusters in various areas of the map
+    // Top-left area (y=0-3)
+    tree_positions.extend([(1, 1), (2, 2), (3, 1), (1, 3), (8, 1), (9, 2), (14, 1), (15, 2)]);
+
+    // Left side (avoid road at x=5, y around 4-10)
+    tree_positions.extend([(1, 6), (2, 7), (1, 13), (2, 14), (3, 15), (1, 17), (2, 18)]);
+
+    // Bottom area (y=17-19)
+    tree_positions.extend([(7, 18), (8, 19), (9, 18), (13, 18), (14, 19), (20, 18), (21, 19)]);
+
+    // Middle-top area (between road segments)
+    tree_positions.extend([(7, 1), (8, 2), (13, 1), (14, 2), (19, 1), (20, 2), (21, 1)]);
+
+    // Right side area (near castle but not blocking)
+    tree_positions.extend([(28, 2), (29, 3), (28, 17), (29, 18)]);
+
+    // Center areas (between road bends)
+    tree_positions.extend([(8, 7), (9, 8), (13, 8), (14, 7), (19, 8), (20, 7)]);
+
+    // Filter out any positions that overlap with blocked tiles
+    let tree_positions: Vec<(i32, i32)> = tree_positions
+        .into_iter()
+        .filter(|pos| !blocked_tiles.contains(pos))
+        .collect();
+
     for (i, (tx, ty)) in tree_positions.iter().enumerate() {
         let tree_pos = tile_to_world(*tx, *ty);
         let tree_sprite = format!("Terrain/Resources/Wood/Trees/Tree{}.png", (i % 4) + 1);
@@ -291,7 +323,7 @@ pub fn worker_arrive_check(
     mut game_state: ResMut<GameState>,
     buildings: Query<&Transform, With<WorkerBuilding>>,
     mut workers: Query<(Entity, &Transform, &mut WorkerState, &WorkerTarget, &mut Worker)>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     for (worker_entity, worker_transform, mut state, target, mut worker) in workers.iter_mut() {
         let worker_pos = worker_transform.translation.truncate();
@@ -415,7 +447,7 @@ pub fn worker_sprite_update(
     asset_server: Res<AssetServer>,
     mut workers: Query<(&WorkerState, &Worker, &mut Sprite, &mut AnimationInfo), Changed<WorkerState>>,
     selected_color: Res<SelectedColor>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     let color = selected_color.0;
     let color_dir = get_color_dir(color);
@@ -664,13 +696,14 @@ pub fn hide_house_menu(
 pub fn handle_build_worker(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
     mut interaction_query: Query<(&Interaction, &BuildWorkerOption), (Changed<Interaction>, With<Button>)>,
     mut game_state: ResMut<GameState>,
     mut menu_state: ResMut<HouseMenuState>,
     menu_entities: Query<Entity, With<HouseMenu>>,
     mut buildings: Query<(Entity, &mut WorkerBuilding, &Transform)>,
     selected_color: Res<SelectedColor>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     for (interaction, option) in interaction_query.iter_mut() {
         if *interaction == Interaction::Pressed {
@@ -688,6 +721,35 @@ pub fn handle_build_worker(
                     let layout = TextureAtlasLayout::from_grid(PAWN_FRAME_SIZE, 8, 1, None, None);
                     let texture_atlas_layout = asset_server.add(layout);
                     let pawn_scale = SCALED_TILE_SIZE / PAWN_FRAME_SIZE.x as f32;
+
+                    // Spawn dust effect at worker spawn position
+                    let dust_frame_count = 8;
+                    let dust_frame_time = 0.08;
+                    let dust_layout = TextureAtlasLayout::from_grid(
+                        UVec2::new(64, 64),
+                        dust_frame_count,
+                        1,
+                        None,
+                        None,
+                    );
+                    let dust_atlas_layout = texture_atlases.add(dust_layout);
+                    let dust_scale = SCALED_TILE_SIZE / 64.0;
+
+                    commands.spawn((
+                        Sprite::from_atlas_image(
+                            asset_server.load("Particle FX/Dust_01.png"),
+                            TextureAtlas {
+                                layout: dust_atlas_layout,
+                                index: 0,
+                            },
+                        ),
+                        Transform::from_xyz(spawn_pos.x, spawn_pos.y, 1.5)
+                            .with_scale(Vec3::splat(dust_scale)),
+                        DustEffect {
+                            frame_count: dust_frame_count as usize,
+                            timer: Timer::from_seconds(dust_frame_time, TimerMode::Repeating),
+                        },
+                    ));
 
                     commands.spawn((
                         Sprite::from_atlas_image(texture, TextureAtlas { layout: texture_atlas_layout, index: 0 }),

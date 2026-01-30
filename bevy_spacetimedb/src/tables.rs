@@ -75,7 +75,7 @@ impl<
 
     /// Registers a table for the bevy application with the specified messages in the `messages` parameter.
     pub fn add_partial_table<TRow, TTable, F>(
-        mut self,
+        self,
         accessor: F,
         messages: TableMessages,
     ) -> Self

@@ -2,6 +2,7 @@ use crate::resources::AppState;
 use crate::systems::SoundEffect;
 use bevy::prelude::*;
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ButtonStyle {
     #[default]
@@ -122,7 +123,7 @@ pub struct MenuPlugin;
 
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<LoginRequestEvent>()
+        app.add_message::<LoginRequestEvent>()
             .add_systems(OnEnter(AppState::MainMenu), setup_menu)
             .add_systems(
                 Update,
@@ -342,9 +343,9 @@ fn spawn_grid_tile(parent: &mut ChildSpawnerCommands, texture: Handle<Image>, re
 fn button_interaction<M: Component>(
     query: Query<&Interaction, (Changed<Interaction>, With<M>)>,
     mut next_state: ResMut<NextState<AppState>>,
-    mut exit: EventWriter<AppExit>,
-    mut login_event: EventWriter<LoginRequestEvent>,
-    mut sound_events: EventWriter<SoundEffect>,
+    mut exit: MessageWriter<AppExit>,
+    mut login_event: MessageWriter<LoginRequestEvent>,
+    mut sound_events: MessageWriter<SoundEffect>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {

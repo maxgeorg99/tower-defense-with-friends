@@ -14,12 +14,10 @@ path = "src/main.rs"
 [[bin]]
 name = "wave-manager"
 path = "src/wave_manager.rs"
-required-features = ["bevy-demo"]
 
 [[bin]]
 name = "tower-manager"
 path = "src/tower_manager.rs"
-required-features = ["bevy-demo"]
 
 [dependencies]
 ratatui = { version = "0.30.0", optional = true }

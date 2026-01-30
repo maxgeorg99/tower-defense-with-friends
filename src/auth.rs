@@ -58,6 +58,7 @@ pub struct AuthState {
 }
 
 /// User profile from ID token
+#[allow(dead_code)]
 #[derive(Clone, Debug, Default)]
 pub struct UserProfile {
     pub name: String,
@@ -451,18 +452,22 @@ mod urlencoding {
 // ============================================================================
 
 /// Marker for the login screen root entity
+#[allow(dead_code)]
 #[derive(Component)]
 pub struct LoginScreen;
 
 /// Marker for the login button
+#[allow(dead_code)]
 #[derive(Component)]
 pub struct LoginButton;
 
 /// Marker for anonymous play button
+#[allow(dead_code)]
 #[derive(Component)]
 pub struct AnonymousPlayButton;
 
 /// Setup the login screen UI
+#[allow(dead_code)]
 pub fn setup_login_screen(mut commands: Commands) {
     commands
         .spawn((
@@ -549,6 +554,7 @@ pub fn setup_login_screen(mut commands: Commands) {
 }
 
 /// Handle login button clicks
+#[allow(dead_code)]
 pub fn handle_login_button(
     mut commands: Commands,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<LoginButton>)>,
@@ -566,6 +572,7 @@ pub fn handle_login_button(
 }
 
 /// Handle anonymous play button clicks
+#[allow(dead_code)]
 pub fn handle_anonymous_button(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<AnonymousPlayButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
@@ -579,6 +586,7 @@ pub fn handle_anonymous_button(
 }
 
 /// Update button colors on hover
+#[allow(dead_code)]
 pub fn update_login_button_colors(
     mut login_query: Query<
         (&Interaction, &mut BackgroundColor, &mut BorderColor),
@@ -698,6 +706,7 @@ pub fn check_auth_and_connect(
 }
 
 /// Cleanup login screen when leaving
+#[allow(dead_code)]
 pub fn cleanup_login_screen(mut commands: Commands, query: Query<Entity, With<LoginScreen>>) {
     for entity in &query {
         commands.entity(entity).despawn();

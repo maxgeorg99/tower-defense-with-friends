@@ -7,7 +7,7 @@ mod module_bindings;
 #[cfg(target_arch = "wasm32")]
 mod wasm_tilemap;
 
-mod bevy;
+mod bevy_plugin;
 mod components;
 mod config;
 mod constants;
@@ -36,7 +36,7 @@ use auth::{
     AuthConfig, AuthState, CallbackServerState, check_auth_and_connect, load_token_from_file,
     start_login,
 };
-use bevy::BevyPlugin;
+use bevy_plugin::BevyPlugin;
 use bevy_kira_audio::{AudioApp, AudioPlugin};
 #[cfg(all(feature = "bevy-demo", not(target_arch = "wasm32")))]
 use debug::DebugPlugin;
@@ -131,7 +131,7 @@ fn main() {
         .add_plugins(WaveManagerPlugin);
 
     #[allow(deprecated)]
-    app.add_event::<SoundEffect>();
+    app.add_message::<SoundEffect>();
 
     #[cfg(target_arch = "wasm32")]
     app.add_plugins(wasm_tilemap::WasmTilemapPlugin);
@@ -261,6 +261,10 @@ fn main() {
                 show_tower_upgrade_menu,
                 hide_tower_upgrade_menu,
                 handle_tower_upgrade,
+                handle_tower_sell,
+                animate_explosion_effects,
+                show_range_indicator,
+                cleanup_range_indicator,
             )
                 .run_if(in_state(AppState::InGame)),
         )
@@ -308,7 +312,7 @@ fn main() {
 #[cfg(not(target_arch = "wasm32"))]
 fn handle_login_request(
     mut commands: Commands,
-    mut events: EventReader<LoginRequestEvent>,
+    mut events: MessageReader<LoginRequestEvent>,
     config: Res<AuthConfig>,
     mut auth_state: ResMut<AuthState>,
 ) {

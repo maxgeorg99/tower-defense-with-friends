@@ -21,7 +21,7 @@ impl<
 {
     /// Registers a procedure message <E> for the bevy application.
     pub fn add_procedure<E: RegisterableProcedureMessage<C, M> + Send + Sync + 'static>(
-        mut self,
+        self,
     ) -> Self {
         let register_fn = move |app: &mut App, procedures: &C::Procedures| {
             let (send, recv) = channel::<ProcedureResultMessage<E>>();

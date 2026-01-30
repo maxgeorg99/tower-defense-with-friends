@@ -5,6 +5,7 @@ use crate::constants::{MAP_HEIGHT, MAP_WIDTH};
 use crate::module_bindings::Color as PlayerColor;
 
 /// SpacetimeDB connection configuration (for deferred connection)
+#[allow(dead_code)]
 #[derive(Resource, Clone)]
 pub struct StdbConfig {
     pub uri: String,
@@ -186,10 +187,6 @@ impl BlockedTiles {
             tiles: std::collections::HashSet::new(),
             castle_tiles: std::collections::HashSet::new(),
         }
-    }
-
-    pub fn is_blocked(&self, tile_x: i32, tile_y: i32) -> bool {
-        self.tiles.contains(&(tile_x, tile_y))
     }
 
     pub fn is_castle(&self, tile_x: i32, tile_y: i32) -> bool {

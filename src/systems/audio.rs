@@ -15,8 +15,12 @@ fn amplitude_to_db(amplitude: f32) -> f32 {
 /// Sound effect events - sent by various systems, played by play_sound_effects
 #[derive(Message)]
 pub enum SoundEffect {
-    /// Tower shoots a projectile
+    /// Tower shoots a projectile (arrow)
     ArrowShoot,
+    /// Holy tower attack
+    HolyAttack,
+    /// Catapult tower attack (stone)
+    StoneAttack,
     /// Worker harvests wood (axe)
     AxeHit,
     /// Worker harvests gold (pickaxe)
@@ -29,18 +33,26 @@ pub enum SoundEffect {
     Reward,
     /// Menu button clicked
     ButtonClick,
+    /// Tower sold/destroyed
+    TowerDestroy,
+    /// Game over
+    GameOver,
 }
 
 /// Resource holding preloaded sound effect handles
 #[derive(Resource)]
 pub struct SoundAssets {
     pub arrow: Handle<bevy_kira_audio::AudioSource>,
+    pub holy: Handle<bevy_kira_audio::AudioSource>,
+    pub stone: Handle<bevy_kira_audio::AudioSource>,
     pub axe: Handle<bevy_kira_audio::AudioSource>,
     pub pickaxe: Handle<bevy_kira_audio::AudioSource>,
     pub sheep: Handle<bevy_kira_audio::AudioSource>,
     pub castle_damage: Handle<bevy_kira_audio::AudioSource>,
     pub reward: Handle<bevy_kira_audio::AudioSource>,
     pub button_click: Handle<bevy_kira_audio::AudioSource>,
+    pub tower_destroy: Handle<bevy_kira_audio::AudioSource>,
+    pub game_over: Handle<bevy_kira_audio::AudioSource>,
     pub background_music: Handle<bevy_kira_audio::AudioSource>,
 }
 
@@ -48,12 +60,16 @@ pub struct SoundAssets {
 pub fn load_sound_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(SoundAssets {
         arrow: asset_server.load("Sound Effects/attack_arrow.mp3"),
+        holy: asset_server.load("Sound Effects/attack_holy.wav"),
+        stone: asset_server.load("Sound Effects/attack_stone.wav"),
         axe: asset_server.load("Sound Effects/axe.mp3"),
         pickaxe: asset_server.load("Sound Effects/pickaxe.mp3"),
         sheep: asset_server.load("Sound Effects/sheep.mp3"),
         castle_damage: asset_server.load("Sound Effects/castle_demage.mp3"),
         reward: asset_server.load("Sound Effects/reward.mp3"),
         button_click: asset_server.load("Sound Effects/choose.mp3"),
+        tower_destroy: asset_server.load("Sound Effects/tower_destroy.mp3"),
+        game_over: asset_server.load("Sound Effects/game_over.mp3"),
         background_music: asset_server.load("Sound Effects/medieval_soundtrack.mp3"),
     });
 }
@@ -106,7 +122,7 @@ pub fn update_background_music_volume(
 
 /// System that plays sound effects when events are received
 pub fn play_sound_effects(
-    mut events: EventReader<SoundEffect>,
+    mut events: MessageReader<SoundEffect>,
     sounds: Option<Res<SoundAssets>>,
     audio: Res<Audio>,
     volume: Res<AudioVolume>,
@@ -116,12 +132,16 @@ pub fn play_sound_effects(
     for event in events.read() {
         let source = match event {
             SoundEffect::ArrowShoot => sounds.arrow.clone(),
+            SoundEffect::HolyAttack => sounds.holy.clone(),
+            SoundEffect::StoneAttack => sounds.stone.clone(),
             SoundEffect::AxeHit => sounds.axe.clone(),
             SoundEffect::PickaxeHit => sounds.pickaxe.clone(),
             SoundEffect::SheepHarvest => sounds.sheep.clone(),
             SoundEffect::CastleDamage => sounds.castle_damage.clone(),
             SoundEffect::Reward => sounds.reward.clone(),
             SoundEffect::ButtonClick => sounds.button_click.clone(),
+            SoundEffect::TowerDestroy => sounds.tower_destroy.clone(),
+            SoundEffect::GameOver => sounds.game_over.clone(),
         };
 
         audio.play(source).with_volume(amplitude_to_db(volume.master));

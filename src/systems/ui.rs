@@ -1,8 +1,6 @@
 use bevy::prelude::*;
 
-use crate::components::{AnimationTimer, Enemy, GameUI, HealthBar, HealthBarFill};
-use crate::constants::SCALED_TILE_SIZE;
-use crate::resources::GameState;
+use crate::components::{AnimationTimer, Enemy, HealthBar, HealthBarFill};
 use crate::systems::AnimationInfo;
 
 pub fn update_health_bars(

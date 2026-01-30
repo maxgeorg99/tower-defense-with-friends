@@ -2,15 +2,12 @@ use bevy::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 use bevy_ecs_tiled::prelude::*;
 use bevy_spacetimedb::*;
-use spacetimedb_sdk::Table;
-use crate::components::{Castle, FogTile, GameUI};
+use crate::components::{Castle, FogTile};
 use crate::constants::{CASTLE_SIZE, MAP_HEIGHT, MAP_SCALE, MAP_WIDTH, SCALED_TILE_SIZE};
 use crate::map::tile_to_world;
-use crate::module_bindings::{Color as PlayerColor, DbConnection, MyUserTableAccess, RemoteModule};
+use crate::module_bindings::{Color as PlayerColor, DbConnection, RemoteModule};
 use crate::resources::{BlockedTiles, FogOfWar, SelectedColor, StdbConfig};
 
-/// Type alias for cleaner SpacetimeDB resource access
-pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
 
 /// Get the color directory name for asset paths
 fn get_color_dir(color: PlayerColor) -> &'static str {

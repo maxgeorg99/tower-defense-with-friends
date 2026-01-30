@@ -227,6 +227,11 @@ pub struct TowerUpgradeOption {
     pub wood_cost: i32,
 }
 
+#[derive(Component)]
+pub struct TowerSellButton {
+    pub gold_refund: i32,
+}
+
 #[derive(Component, Default)]
 pub struct TowerLevel {
     pub damage_level: i32,
@@ -239,6 +244,17 @@ pub struct TowerLevel {
 pub struct HolyTowerEffect {
     pub lifetime: Timer,
 }
+
+/// Temporary visual effect component for explosion animation (tower sell)
+#[derive(Component)]
+pub struct ExplosionEffect {
+    pub frame_count: usize,
+    pub timer: Timer,
+}
+
+/// Range indicator circle shown when selecting a tower to place
+#[derive(Component)]
+pub struct RangeIndicator;
 
 /// Helper to get attack type icon path
 pub fn get_attack_type_icon(attack_type: AttackType) -> &'static str {
