@@ -15,8 +15,12 @@ generate:
 publish-local:
     spacetime publish {{MODULE_NAME}} --project-path spacetimedb
 
-# Publish to maincloud
+# Publish to maincloud (keeps existing data)
 publish-maincloud:
+    spacetime publish {{MODULE_NAME}} --server maincloud --project-path spacetimedb
+
+# Publish to maincloud and reset all data
+publish-maincloud-reset:
     spacetime publish {{MODULE_NAME}} --server maincloud --project-path spacetimedb --delete-data
 
 # Build + generate + publish locally

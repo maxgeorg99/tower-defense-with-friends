@@ -8,7 +8,11 @@ use crate::config::TowerType;
 use crate::constants::{ARROW_SIZE, EXPLORE_COST, EXPLORE_RADIUS, SCALED_TILE_SIZE, TOWER_SIZE};
 use crate::map::world_to_tile;
 use crate::module_bindings;
-use crate::module_bindings::{DbConnection, MyUserTableAccess, UserTableAccess};
+use crate::module_bindings::{
+    DbConnection, MyUserTableAccess, UserTableAccess,
+    place_tower, upgrade_tower_damage, upgrade_tower_range, upgrade_tower_fire_rate
+};
+use crate::systems::entity_sync::EntityMap;
 use crate::resources::{BlockedTiles, FogOfWar, GameState, HouseMenuState, RecruitMenuState, TowerConfigs, TowerUpgradeMenuState, TowerWheelState};
 
 //TODO Display for generated Types?!
@@ -362,15 +366,34 @@ pub fn handle_tower_selection(
                             (wheel_state.position.x / SCALED_TILE_SIZE).round() * SCALED_TILE_SIZE;
                         let snapped_y =
                             (wheel_state.position.y / SCALED_TILE_SIZE).round() * SCALED_TILE_SIZE;
-                        let snapped_pos = Vec3::new(snapped_x, snapped_y, 1.0);
 
                         // Check if tile is explored (not in fog)
                         let (tile_x, tile_y) = world_to_tile(Vec2::new(snapped_x, snapped_y));
                         let is_explored = fog.is_explored(tile_x, tile_y);
 
+                        // Only attempt placement if tile is explored and we might have gold
+                        // Server will validate gold and handle deduction
                         if game_state.gold >= tower_type.cost && is_explored {
-                            spawn_tower(&mut commands, &asset_server, snapped_pos, tower_type, stdb);
-                            game_state.gold -= tower_type.cost;
+                            if let Some(ref stdb) = stdb {
+                                // Call the server reducer to place tower
+                                // Server will validate gold, deduct it, and create entities
+                                // Entity sync will spawn the visual representation
+                                if let Err(e) = stdb.conn().reducers.place_tower(
+                                    tower_type.id.clone(),
+                                    snapped_x,
+                                    snapped_y,
+                                ) {
+                                    error!("Failed to place tower: {:?}", e);
+                                } else {
+                                    info!("Tower placement requested: {} at ({}, {})",
+                                        tower_type.id, snapped_x, snapped_y);
+                                }
+                            } else {
+                                // Fallback for offline/non-networked mode - spawn locally
+                                let snapped_pos = Vec3::new(snapped_x, snapped_y, 1.0);
+                                spawn_tower(&mut commands, &asset_server, snapped_pos, tower_type, None);
+                                game_state.gold -= tower_type.cost;
+                            }
                         }
                     }
                 }
@@ -854,10 +877,11 @@ pub fn handle_tower_upgrade(
         (&Interaction, &TowerUpgradeOption),
         (Changed<Interaction>, With<Button>),
     >,
-    mut game_state: ResMut<GameState>,
+    game_state: Res<GameState>,
     mut menu_state: ResMut<TowerUpgradeMenuState>,
     menu_entities: Query<Entity, With<TowerUpgradeMenu>>,
-    mut towers: Query<(&mut Tower, &mut TowerLevel)>,
+    entity_map: Res<EntityMap>,
+    stdb: Option<SpacetimeDB>,
     mut sound_events: EventWriter<SoundEffect>,
 ) {
     for (interaction, option) in interaction_query.iter_mut() {
@@ -865,42 +889,41 @@ pub fn handle_tower_upgrade(
             sound_events.write(SoundEffect::ButtonClick);
             if game_state.wood >= option.wood_cost {
                 if let Some(tower_entity) = menu_state.selected_tower {
-                    if let Ok((mut tower, mut tower_level)) = towers.get_mut(tower_entity) {
-                        game_state.wood -= option.wood_cost;
+                    // Look up the server entity_id from the Bevy entity
+                    if let Some(server_id) = entity_map.bevy_to_server.get(&tower_entity) {
+                        if let Some(ref stdb) = stdb {
+                            // Call the appropriate reducer based on upgrade type
+                            let result = match option.upgrade_type {
+                                UpgradeType::Damage => {
+                                    info!("Requesting damage upgrade for tower {}", server_id);
+                                    stdb.conn().reducers.upgrade_tower_damage(*server_id)
+                                }
+                                UpgradeType::Range => {
+                                    info!("Requesting range upgrade for tower {}", server_id);
+                                    stdb.conn().reducers.upgrade_tower_range(*server_id)
+                                }
+                                UpgradeType::FireRate => {
+                                    info!("Requesting fire rate upgrade for tower {}", server_id);
+                                    stdb.conn().reducers.upgrade_tower_fire_rate(*server_id)
+                                }
+                            };
 
-                        match option.upgrade_type {
-                            UpgradeType::Damage => {
-                                tower.damage *= 1.25;
-                                tower_level.damage_level += 1;
-                                info!(
-                                    "Tower damage upgraded to {:.0} (level {})",
-                                    tower.damage, tower_level.damage_level
-                                );
+                            if let Err(e) = result {
+                                error!("Failed to upgrade tower: {:?}", e);
                             }
-                            UpgradeType::Range => {
-                                tower.range *= 1.20;
-                                tower_level.range_level += 1;
-                                info!(
-                                    "Tower range upgraded to {:.0} (level {})",
-                                    tower.range, tower_level.range_level
-                                );
-                            }
-                            UpgradeType::FireRate => {
-                                tower.fire_rate *= 0.80;
-                                tower_level.fire_rate_level += 1;
-                                info!(
-                                    "Tower fire rate upgraded to {:.2}s (level {})",
-                                    tower.fire_rate, tower_level.fire_rate_level
-                                );
-                            }
+                        } else {
+                            info!("No network connection - upgrades require server");
                         }
 
-                        // Close menu after successful upgrade
+                        // Close menu after requesting upgrade
+                        // (server sync will update the tower stats)
                         for entity in menu_entities.iter() {
                             commands.entity(entity).despawn();
                         }
                         menu_state.active = false;
                         menu_state.selected_tower = None;
+                    } else {
+                        warn!("Tower entity not found in entity map - may be a local tower");
                     }
                 }
             } else {

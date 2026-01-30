@@ -9,12 +9,9 @@ use crate::components::{
 };
 use crate::constants::SCALED_TILE_SIZE;
 use crate::map::tile_to_world;
-use crate::module_bindings::{Color as PlayerColor, DbConnection, MyUserTableAccess};
-use crate::resources::{GameState, HouseMenuState, RecruitMenuState, TowerUpgradeMenuState, TowerWheelState};
+use crate::module_bindings::Color as PlayerColor;
+use crate::resources::{GameState, HouseMenuState, RecruitMenuState, SelectedColor, TowerUpgradeMenuState, TowerWheelState};
 use crate::systems::{AnimationInfo, SoundEffect};
-
-/// Type alias for cleaner SpacetimeDB resource access
-pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
 
 const PAWN_FRAME_SIZE: UVec2 = UVec2::new(192, 192);
 const WORKER_SPEED: f32 = 30.0;
@@ -34,21 +31,13 @@ fn get_color_dir(color: PlayerColor) -> &'static str {
     }
 }
 
-/// Get the current player's color from SpacetimeDB, defaulting to Blue
-fn get_player_color(stdb: &Option<SpacetimeDB>) -> PlayerColor {
-    stdb.as_ref()
-        .and_then(|db| db.db().my_user().iter().next())
-        .map(|user| user.color)
-        .unwrap_or(PlayerColor::Blue)
-}
-
 /// Setup resource gathering - spawns building, trees, gold mines, and sheep
 pub fn setup_resource_gathering(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    stdb: Option<SpacetimeDB>,
+    selected_color: Res<SelectedColor>,
 ) {
-    let color = get_player_color(&stdb);
+    let color = selected_color.0;
     let color_dir = get_color_dir(color);
 
     // Spawn worker building (House1) close to castle (castle is at ~tile 27, 10)
@@ -183,9 +172,9 @@ pub fn spawn_workers(
     asset_server: Res<AssetServer>,
     time: Res<Time>,
     mut buildings: Query<(Entity, &mut WorkerBuilding, &Transform)>,
-    stdb: Option<SpacetimeDB>,
+    selected_color: Res<SelectedColor>,
 ) {
-    let color = get_player_color(&stdb);
+    let color = selected_color.0;
     let color_dir = get_color_dir(color);
 
     for (building_entity, mut building, building_transform) in buildings.iter_mut() {
@@ -425,10 +414,10 @@ pub fn worker_harvest(
 pub fn worker_sprite_update(
     asset_server: Res<AssetServer>,
     mut workers: Query<(&WorkerState, &Worker, &mut Sprite, &mut AnimationInfo), Changed<WorkerState>>,
-    stdb: Option<SpacetimeDB>,
+    selected_color: Res<SelectedColor>,
     mut sound_events: EventWriter<SoundEffect>,
 ) {
-    let color = get_player_color(&stdb);
+    let color = selected_color.0;
     let color_dir = get_color_dir(color);
 
     for (state, worker, mut sprite, mut anim_info) in workers.iter_mut() {
@@ -510,7 +499,7 @@ pub fn show_house_menu(
     upgrade_menu_state: Res<TowerUpgradeMenuState>,
     buildings: Query<&Transform, With<WorkerBuilding>>,
     existing_menus: Query<Entity, With<HouseMenu>>,
-    stdb: Option<SpacetimeDB>,
+    selected_color: Res<SelectedColor>,
 ) {
     if !mouse_button.just_pressed(MouseButton::Left)
         || house_menu_state.active
@@ -533,8 +522,7 @@ pub fn show_house_menu(
                 commands.entity(entity).despawn();
             }
             house_menu_state.active = true;
-            let player_color = get_player_color(&stdb);
-            spawn_house_menu(&mut commands, &asset_server, player_color);
+            spawn_house_menu(&mut commands, &asset_server, selected_color.0);
             return;
         }
     }
@@ -681,7 +669,7 @@ pub fn handle_build_worker(
     mut menu_state: ResMut<HouseMenuState>,
     menu_entities: Query<Entity, With<HouseMenu>>,
     mut buildings: Query<(Entity, &mut WorkerBuilding, &Transform)>,
-    stdb: Option<SpacetimeDB>,
+    selected_color: Res<SelectedColor>,
     mut sound_events: EventWriter<SoundEffect>,
 ) {
     for (interaction, option) in interaction_query.iter_mut() {
@@ -692,7 +680,7 @@ pub fn handle_build_worker(
 
                 if let Some((building_entity, mut building, building_transform)) = buildings.iter_mut().next() {
                     let spawn_pos = building_transform.translation.truncate();
-                    let color = get_player_color(&stdb);
+                    let color = selected_color.0;
                     let color_dir = get_color_dir(color);
 
                     let texture_path = format!("Units/{} Units/Pawn/Pawn_Idle.png", color_dir);

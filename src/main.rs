@@ -20,6 +20,15 @@ use config::{TowersConfig, UnitsConfig, WavesConfig};
 use ::bevy::prelude::*;
 use bevy_spacetimedb::*;
 use module_bindings::user_table::UserTableAccess;
+use module_bindings::game_state_table::GameStateTableAccess;
+use module_bindings::wave_state_table::WaveStateTableAccess;
+use module_bindings::game_entity_table::GameEntityTableAccess;
+use module_bindings::tower_component_table::TowerComponentTableAccess;
+use module_bindings::enemy_component_table::EnemyComponentTableAccess;
+use module_bindings::projectile_component_table::ProjectileComponentTableAccess;
+use module_bindings::tower_type_def_table::TowerTypeDefTableAccess;
+use module_bindings::enemy_type_def_table::EnemyTypeDefTableAccess;
+use module_bindings::path_waypoint_table::PathWaypointTableAccess;
 use module_bindings::{DbConnection, RemoteModule, RemoteTables};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -141,14 +150,29 @@ fn main() {
         .with_module_name(&stdb_module)
         .with_run_fn(DbConnection::run_threaded)
         .with_delayed_connect(true)
-        .add_table(|tables: &RemoteTables| tables.user());
+        // User tables
+        .add_table(|tables: &RemoteTables| tables.user())
+        // Game state tables
+        .add_table(|tables: &RemoteTables| tables.game_state())
+        .add_table(|tables: &RemoteTables| tables.wave_state())
+        // Entity tables
+        .add_table(|tables: &RemoteTables| tables.game_entity())
+        .add_table(|tables: &RemoteTables| tables.tower_component())
+        .add_table(|tables: &RemoteTables| tables.enemy_component())
+        .add_table(|tables: &RemoteTables| tables.projectile_component())
+        // Definition tables
+        .add_table(|tables: &RemoteTables| tables.tower_type_def())
+        .add_table(|tables: &RemoteTables| tables.enemy_type_def())
+        .add_table(|tables: &RemoteTables| tables.path_waypoint());
 
     app.add_plugins(stdb_plugin);
 
     app.insert_state(initial_state)
         .init_resource::<GameState>()
+        .init_resource::<EntityMap>()
         .init_resource::<AuthConfig>()
         .init_resource::<AuthState>()
+        .init_resource::<SelectedColor>()
         .insert_resource(WavesConfig::load().unwrap())
         .insert_resource(UnitsConfig::load().unwrap())
         .insert_resource(spawner)
@@ -195,6 +219,17 @@ fn main() {
                 on_user_inserted,
                 on_user_updated,
                 on_user_deleted,
+                sync_game_state,
+                sync_player_resources,
+                // Entity sync systems
+                on_game_entity_inserted,
+                on_game_entity_updated,
+                on_game_entity_deleted,
+                on_tower_component_inserted,
+                on_tower_component_updated,
+                on_enemy_component_inserted,
+                on_enemy_component_updated,
+                on_projectile_component_inserted,
                 update_online_users_ui,
             ),
         )

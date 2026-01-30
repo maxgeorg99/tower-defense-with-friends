@@ -1,9 +1,13 @@
 use bevy::prelude::*;
+use bevy_spacetimedb::StdbConnection;
 use crate::components::{get_defense_type_icon, AnimationTimer, DefenseType, Enemy};
 use crate::config::{UnitSpawn, UnitType, UnitsConfig, Wave, WavesConfig};
+use crate::module_bindings::{DbConnection, start_wave as start_wave_reducer};
 use crate::resources::{AppState, EnemySpawner, GameState, PathWaypoints, WaveConfigs};
 use crate::resources::AppState::InGame;
 use crate::systems::AnimationInfo;
+
+pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
 // ============================================================================
 // Components
 // ============================================================================
@@ -296,6 +300,7 @@ pub fn countdown_wave_timer(
     time: Res<Time>,
     mut wave_manager: ResMut<WaveManager>,
     spawner: Option<ResMut<EnemySpawner>>,
+    stdb: Option<SpacetimeDB>,
 ) {
     if wave_manager.wave_active {
         return;
@@ -308,12 +313,27 @@ pub fn countdown_wave_timer(
     wave_manager.current_prep_time -= time.delta_secs();
 
     if wave_manager.current_prep_time <= 0.0 {
-        start_wave(&mut wave_manager, &mut spawner);
+        // Call server reducer to start wave (server handles wave state authoritatively)
+        if let Some(ref stdb) = stdb {
+            if let Err(e) = stdb.conn().reducers.start_wave() {
+                warn!("Failed to start wave via server: {:?}", e);
+                // Fallback to local wave start
+                start_wave_local(&mut wave_manager, &mut spawner);
+            } else {
+                info!("Wave start requested from server");
+                // Also start locally for immediate feedback
+                // Server sync will correct if needed
+                start_wave_local(&mut wave_manager, &mut spawner);
+            }
+        } else {
+            // No server connection - start locally
+            start_wave_local(&mut wave_manager, &mut spawner);
+        }
     }
 }
 
-/// Start the wave (called by timer or button)
-fn start_wave(wave_manager: &mut WaveManager, spawner: &mut EnemySpawner) {
+/// Start the wave locally (called by timer or button, or as fallback from server)
+fn start_wave_local(wave_manager: &mut WaveManager, spawner: &mut EnemySpawner) {
     wave_manager.wave_active = true;
     wave_manager.current_prep_time = 0.0;
     spawner.timer.reset(); // Start spawning immediately

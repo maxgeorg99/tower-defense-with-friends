@@ -27,7 +27,8 @@ pub use tables::message::Message;
 // Import table access traits
 use tables::user::user as UserTable;
 use tables::game_state::{GameState, game_state as GameStateTable};
-use tables::wave::{WaveState, wave_state as WaveStateTable};
+use tables::wave::{WaveState, wave_state as WaveStateTable, TowerTypeDef, tower_type_def as TowerTypeDefTable, EnemyTypeDef, enemy_type_def as EnemyTypeDefTable};
+use tables::components::{AttackType, DefenseType};
 
 // =============================================================================
 // Lifecycle Hooks
@@ -41,6 +42,10 @@ pub fn init(ctx: &ReducerContext) {
     // Initialize singleton tables
     init_game_state(ctx);
     init_wave_state(ctx);
+
+    // Seed static data
+    init_tower_types(ctx);
+    init_enemy_types(ctx);
 
     // Initialize all agents (scheduled game loops)
     agents::init(ctx);
@@ -62,6 +67,150 @@ fn init_wave_state(ctx: &ReducerContext) {
     }
 }
 
+/// Initialize tower type definitions (seed data)
+fn init_tower_types(ctx: &ReducerContext) {
+    // Only seed if table is empty
+    if ctx.db.tower_type_def().iter().next().is_some() {
+        return;
+    }
+
+    let towers = vec![
+        TowerTypeDef {
+            tower_type: "archer".to_string(),
+            name: "Archer".to_string(),
+            cost: 50,
+            base_range: 256.0,
+            base_damage: 25.0,
+            base_fire_rate: 0.5,
+            projectile_speed: 300.0,
+            attack_type: AttackType::Pierce,
+        },
+        TowerTypeDef {
+            tower_type: "catapult".to_string(),
+            name: "Catapult".to_string(),
+            cost: 100,
+            base_range: 384.0,
+            base_damage: 60.0,
+            base_fire_rate: 1.5,
+            projectile_speed: 200.0,
+            attack_type: AttackType::Blunt,
+        },
+        TowerTypeDef {
+            tower_type: "holy".to_string(),
+            name: "Holy".to_string(),
+            cost: 300,
+            base_range: 256.0,
+            base_damage: 25.0,
+            base_fire_rate: 5.0,
+            projectile_speed: 300.0,
+            attack_type: AttackType::Divine,
+        },
+        TowerTypeDef {
+            tower_type: "tower".to_string(),
+            name: "Tower".to_string(),
+            cost: 50,
+            base_range: 256.0,
+            base_damage: 25.0,
+            base_fire_rate: 0.5,
+            projectile_speed: 300.0,
+            attack_type: AttackType::Pierce,
+        },
+    ];
+
+    for tower in towers {
+        ctx.db.tower_type_def().insert(tower);
+    }
+    log::info!("Tower type definitions seeded");
+}
+
+/// Initialize enemy type definitions (seed data)
+fn init_enemy_types(ctx: &ReducerContext) {
+    // Only seed if table is empty
+    if ctx.db.enemy_type_def().iter().next().is_some() {
+        return;
+    }
+
+    let enemies = vec![
+        EnemyTypeDef {
+            enemy_type: "warrior".to_string(),
+            name: "Red Warrior".to_string(),
+            base_health: 50.0,
+            base_speed: 50.0,
+            gold_reward: 10,
+            damage_to_base: 1,
+            defense_type: DefenseType::Armor,
+        },
+        EnemyTypeDef {
+            enemy_type: "archer".to_string(),
+            name: "Red Archer".to_string(),
+            base_health: 30.0,
+            base_speed: 60.0,
+            gold_reward: 8,
+            damage_to_base: 1,
+            defense_type: DefenseType::Agility,
+        },
+        EnemyTypeDef {
+            enemy_type: "lancer".to_string(),
+            name: "Red Lancer".to_string(),
+            base_health: 80.0,
+            base_speed: 40.0,
+            gold_reward: 15,
+            damage_to_base: 2,
+            defense_type: DefenseType::Armor,
+        },
+        EnemyTypeDef {
+            enemy_type: "monk".to_string(),
+            name: "Red Monk".to_string(),
+            base_health: 80.0,
+            base_speed: 40.0,
+            gold_reward: 25,
+            damage_to_base: 3,
+            defense_type: DefenseType::Mystical,
+        },
+        EnemyTypeDef {
+            enemy_type: "skull".to_string(),
+            name: "Skull".to_string(),
+            base_health: 70.0,
+            base_speed: 45.0,
+            gold_reward: 12,
+            damage_to_base: 2,
+            defense_type: DefenseType::Mystical,
+        },
+        EnemyTypeDef {
+            enemy_type: "turtle".to_string(),
+            name: "Turtle".to_string(),
+            base_health: 120.0,
+            base_speed: 20.0,
+            gold_reward: 15,
+            damage_to_base: 1,
+            defense_type: DefenseType::Armor,
+        },
+        EnemyTypeDef {
+            enemy_type: "minotaur".to_string(),
+            name: "Minotaur".to_string(),
+            base_health: 150.0,
+            base_speed: 35.0,
+            gold_reward: 20,
+            damage_to_base: 3,
+            defense_type: DefenseType::Armor,
+        },
+        EnemyTypeDef {
+            enemy_type: "ogre".to_string(),
+            name: "Ogre".to_string(),
+            base_health: 400.0,
+            base_speed: 25.0,
+            gold_reward: 50,
+            damage_to_base: 5,
+            defense_type: DefenseType::Armor,
+        },
+    ];
+
+    for enemy in enemies {
+        ctx.db.enemy_type_def().insert(enemy);
+    }
+    log::info!("Enemy type definitions seeded");
+}
+
 /// Called when a client connects
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
@@ -74,13 +223,8 @@ pub fn identity_connected(ctx: &ReducerContext) {
         ctx.db.user().identity().update(user);
         log::info!("User reconnected: {:?}", identity);
     } else {
-        // New user - create with default values
-        let new_user = User {
-            identity,
-            name: None,
-            color: Color::Purple,
-            online: true,
-        };
+        // New user - create with default resources
+        let new_user = User::new(identity);
         ctx.db.user().insert(new_user);
         log::info!("New user connected: {:?}", identity);
     }

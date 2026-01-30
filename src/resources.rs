@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::config::{TowerType, UnitType, Wave};
 use crate::constants::{MAP_HEIGHT, MAP_WIDTH};
+use crate::module_bindings::Color as PlayerColor;
 
 /// SpacetimeDB connection configuration (for deferred connection)
 #[derive(Resource, Clone)]
@@ -9,6 +10,16 @@ pub struct StdbConfig {
     pub uri: String,
     pub module: String,
     pub token: Option<String>,
+}
+
+/// Locally stored selected color (updated when user selects color and when SpacetimeDB syncs)
+#[derive(Resource, Clone, Copy)]
+pub struct SelectedColor(pub PlayerColor);
+
+impl Default for SelectedColor {
+    fn default() -> Self {
+        Self(PlayerColor::Blue)
+    }
 }
 
 #[derive(Resource)]

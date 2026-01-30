@@ -11,7 +11,7 @@ use crate::tables::worker::{
     resource_node_component as ResourceNodeComponentTable,
     WORKER_COST, WORKER_SPEED,
 };
-use crate::tables::game_state::{GameState, game_state as GameStateTable};
+use crate::tables::user::{User, user as UserTable};
 
 /// Buy a new worker for a building
 #[spacetimedb::reducer]
@@ -38,20 +38,20 @@ pub fn buy_worker(ctx: &ReducerContext, building_entity_id: u64) -> Result<(), S
         ));
     }
 
-    // Check gold
-    let mut game_state = ctx.db.game_state().id().find(0)
-        .ok_or("Game state not found")?;
+    // Check player's gold
+    let mut player = ctx.db.user().identity().find(owner)
+        .ok_or("Player not found")?;
 
-    if game_state.gold < WORKER_COST {
+    if player.gold < WORKER_COST {
         return Err(format!(
             "Not enough gold. Need {}, have {}",
-            WORKER_COST, game_state.gold
+            WORKER_COST, player.gold
         ));
     }
 
-    // Deduct gold
-    game_state.gold -= WORKER_COST;
-    ctx.db.game_state().id().update(game_state);
+    // Deduct gold from player
+    player.gold -= WORKER_COST;
+    ctx.db.user().identity().update(player);
 
     // Create worker entity at building position
     let worker_entity = GameEntity::new_unit(owner, building_entity.x, building_entity.y);

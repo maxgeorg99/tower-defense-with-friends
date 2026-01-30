@@ -6,7 +6,7 @@
 //
 // =============================================================================
 
-use spacetimedb::{ReducerContext, ScheduleAt, Table, TimeDuration};
+use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table, TimeDuration};
 use crate::tables::game_entity::{GameEntity, EntityType, game_entity as GameEntityTable};
 use crate::tables::components::{
     ProjectileComponent, EnemyComponent,
@@ -15,6 +15,7 @@ use crate::tables::components::{
     enemy_component as EnemyComponentTable,
 };
 use crate::tables::game_state::{GameState, game_state as GameStateTable};
+use crate::tables::user::{User, user as UserTable};
 
 /// Projectile tick interval in microseconds (50ms = 20Hz)
 const PROJECTILE_TICK_US: i64 = 50_000;
@@ -95,7 +96,7 @@ fn process_projectiles(ctx: &ReducerContext) {
 
         if distance <= HIT_RADIUS {
             // Hit! Apply damage
-            handle_projectile_hit(ctx, &projectile, projectile.target_id);
+            handle_projectile_hit(ctx, &projectile, projectile.target_id, proj_entity.owner);
             despawn_projectile(ctx, proj_entity.entity_id);
         } else {
             // Move towards target
@@ -123,7 +124,7 @@ fn process_projectiles(ctx: &ReducerContext) {
     }
 }
 
-fn handle_projectile_hit(ctx: &ReducerContext, projectile: &ProjectileComponent, target_id: u64) {
+fn handle_projectile_hit(ctx: &ReducerContext, projectile: &ProjectileComponent, target_id: u64, owner: Option<Identity>) {
     let Some(mut enemy) = ctx.db.enemy_component().entity_id().find(target_id) else {
         return;
     };
@@ -136,7 +137,7 @@ fn handle_projectile_hit(ctx: &ReducerContext, projectile: &ProjectileComponent,
 
     if enemy.health <= 0.0 {
         // Enemy killed
-        handle_enemy_death(ctx, target_id, &enemy);
+        handle_enemy_death(ctx, target_id, &enemy, owner);
     } else {
         ctx.db.enemy_component().entity_id().update(enemy);
     }
@@ -155,10 +156,18 @@ fn despawn_projectile(ctx: &ReducerContext, entity_id: u64) {
     ctx.db.projectile_component().entity_id().delete(entity_id);
 }
 
-fn handle_enemy_death(ctx: &ReducerContext, entity_id: u64, enemy: &EnemyComponent) {
-    // Award gold and score
+fn handle_enemy_death(ctx: &ReducerContext, entity_id: u64, enemy: &EnemyComponent, owner: Option<Identity>) {
+    // Award gold to the player who killed the enemy
+    if let Some(owner_identity) = owner {
+        if let Some(mut player) = ctx.db.user().identity().find(owner_identity) {
+            player.gold += enemy.gold_reward;
+            ctx.db.user().identity().update(player);
+            log::debug!("Awarded {} gold to player {:?}", enemy.gold_reward, owner_identity);
+        }
+    }
+
+    // Update game state score and kill count (score is still shared/global)
     if let Some(mut game_state) = ctx.db.game_state().id().find(0) {
-        game_state.gold += enemy.gold_reward;
         game_state.score += enemy.gold_reward;
         game_state.enemies_killed += 1;
         ctx.db.game_state().id().update(game_state);

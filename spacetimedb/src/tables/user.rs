@@ -21,6 +21,27 @@ pub struct User {
     pub name: Option<String>,
     pub color: Color,
     pub online: bool,
+    /// Player's gold resource
+    pub gold: i32,
+    /// Player's wood resource
+    pub wood: i32,
+    /// Player's meat resource
+    pub meat: i32,
+}
+
+impl User {
+    /// Create a new user with default resources
+    pub fn new(identity: Identity) -> Self {
+        Self {
+            identity,
+            name: None,
+            color: Color::Blue,
+            online: true,
+            gold: 100,
+            wood: 0,
+            meat: 0,
+        }
+    }
 }
 
 /// View that returns the current user's profile

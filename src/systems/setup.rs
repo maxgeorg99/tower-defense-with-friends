@@ -7,7 +7,7 @@ use crate::components::{Castle, FogTile, GameUI};
 use crate::constants::{CASTLE_SIZE, MAP_HEIGHT, MAP_SCALE, MAP_WIDTH, SCALED_TILE_SIZE};
 use crate::map::tile_to_world;
 use crate::module_bindings::{Color as PlayerColor, DbConnection, MyUserTableAccess, RemoteModule};
-use crate::resources::{BlockedTiles, FogOfWar, StdbConfig};
+use crate::resources::{BlockedTiles, FogOfWar, SelectedColor, StdbConfig};
 
 /// Type alias for cleaner SpacetimeDB resource access
 pub type SpacetimeDB<'a> = Res<'a, StdbConnection<DbConnection>>;
@@ -20,14 +20,6 @@ fn get_color_dir(color: PlayerColor) -> &'static str {
         PlayerColor::Purple => "Purple",
         PlayerColor::Black => "Black",
     }
-}
-
-/// Get the current player's color from SpacetimeDB, defaulting to Blue
-fn get_player_color(stdb: &Option<SpacetimeDB>) -> PlayerColor {
-    stdb.as_ref()
-        .and_then(|db| db.db().my_user().iter().next())
-        .map(|user| user.color)
-        .unwrap_or(PlayerColor::Blue)
 }
 
 /// Setup camera (runs on startup, needed for all states)
@@ -56,9 +48,9 @@ pub fn connect_to_spacetimedb(world: &mut World) {
 pub fn setup_game(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    stdb: Option<SpacetimeDB>,
+    selected_color: Res<SelectedColor>,
 ) {
-    let color = get_player_color(&stdb);
+    let color = selected_color.0;
     let color_dir = get_color_dir(color);
 
     // Load and spawn the tilemap (native only - bevy_ecs_tiled doesn't compile to WASM)

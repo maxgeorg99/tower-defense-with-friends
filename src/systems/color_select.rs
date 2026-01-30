@@ -264,10 +264,14 @@ pub fn handle_color_button_click(
     stdb: Option<SpacetimeDB>,
     interaction_query: Query<(&Interaction, &ColorButton), (Changed<Interaction>, With<Button>)>,
     mut sound_events: EventWriter<SoundEffect>,
+    mut selected_color: ResMut<crate::resources::SelectedColor>,
 ) {
     for (interaction, color_button) in interaction_query.iter() {
         if *interaction == Interaction::Pressed {
             sound_events.write(SoundEffect::ButtonClick);
+            // Set local color immediately for responsive UI
+            selected_color.0 = color_button.0;
+            // Also send to server
             let Some(stdb) = &stdb else { continue };
             if let Err(e) = stdb.reducers().set_color(color_button.0) {
                 eprintln!("Failed to set color: {}", e);

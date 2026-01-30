@@ -6,7 +6,7 @@ use spacetimedb::{ReducerContext, Table};
 use crate::tables::game_entity::{GameEntity, EntityType, game_entity as GameEntityTable};
 use crate::tables::components::{TowerComponent, AttackType, tower_component as TowerComponentTable};
 use crate::tables::wave::{TowerTypeDef, tower_type_def as TowerTypeDefTable};
-use crate::tables::game_state::{GameState, game_state as GameStateTable};
+use crate::tables::user::{User, user as UserTable};
 
 /// Place a new tower at the specified position
 #[spacetimedb::reducer]
@@ -22,20 +22,21 @@ pub fn place_tower(
     let tower_def = ctx.db.tower_type_def().tower_type().find(&tower_type)
         .ok_or_else(|| format!("Unknown tower type: {}", tower_type))?;
 
-    // Check if player has enough gold
-    let mut game_state = ctx.db.game_state().id().find(0)
-        .ok_or("Game state not found")?;
+    // Get player and check if they have enough gold
+    let mut player = ctx.db.user().identity().find(owner)
+        .ok_or("Player not found")?;
 
-    if game_state.gold < tower_def.cost {
+    if player.gold < tower_def.cost {
         return Err(format!(
             "Not enough gold. Need {}, have {}",
-            tower_def.cost, game_state.gold
+            tower_def.cost, player.gold
         ));
     }
 
-    // Deduct gold
-    game_state.gold -= tower_def.cost;
-    ctx.db.game_state().id().update(game_state);
+    // Deduct gold from player
+    player.gold -= tower_def.cost;
+    let remaining_gold = player.gold;
+    ctx.db.user().identity().update(player);
 
     // Create the base entity
     let entity = GameEntity::new_tower(owner, x, y);
@@ -59,8 +60,8 @@ pub fn place_tower(
     ctx.db.tower_component().insert(tower_component);
 
     log::info!(
-        "Player {:?} placed {} tower at ({}, {})",
-        owner, tower_type, x, y
+        "Player {:?} placed {} tower at ({}, {}) - {} gold remaining",
+        owner, tower_type, x, y, remaining_gold
     );
 
     Ok(())
@@ -126,14 +127,14 @@ where
         return Err("Entity is not a tower".to_string());
     }
 
-    // Check resources
-    let mut game_state = ctx.db.game_state().id().find(0)
-        .ok_or("Game state not found")?;
+    // Check player's resources
+    let mut player = ctx.db.user().identity().find(owner)
+        .ok_or("Player not found")?;
 
-    if game_state.wood < wood_cost {
+    if player.wood < wood_cost {
         return Err(format!(
             "Not enough wood. Need {}, have {}",
-            wood_cost, game_state.wood
+            wood_cost, player.wood
         ));
     }
 
@@ -141,9 +142,9 @@ where
     let mut tower = ctx.db.tower_component().entity_id().find(entity_id)
         .ok_or("Tower component not found")?;
 
-    // Deduct cost and apply upgrade
-    game_state.wood -= wood_cost;
-    ctx.db.game_state().id().update(game_state);
+    // Deduct cost from player and apply upgrade
+    player.wood -= wood_cost;
+    ctx.db.user().identity().update(player);
 
     apply_upgrade(&mut tower);
     ctx.db.tower_component().entity_id().update(tower);
@@ -181,11 +182,11 @@ pub fn sell_tower(ctx: &ReducerContext, entity_id: u64) -> Result<(), String> {
         .map(|def| (def.cost as f32 * SELL_REFUND_PERCENT) as i32)
         .unwrap_or(0);
 
-    // Add refund to gold
-    let mut game_state = ctx.db.game_state().id().find(0)
-        .ok_or("Game state not found")?;
-    game_state.gold += refund;
-    ctx.db.game_state().id().update(game_state);
+    // Add refund to player's gold
+    let mut player = ctx.db.user().identity().find(owner)
+        .ok_or("Player not found")?;
+    player.gold += refund;
+    ctx.db.user().identity().update(player);
 
     // Mark entity as inactive (will be cleaned up by cleanup agent)
     entity.active = false;

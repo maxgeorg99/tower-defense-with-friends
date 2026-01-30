@@ -18,7 +18,7 @@ use crate::tables::worker::{
     worker_building_component as WorkerBuildingComponentTable,
     resource_node_component as ResourceNodeComponentTable,
 };
-use crate::tables::game_state::{GameState, game_state as GameStateTable};
+use crate::tables::user::{User, user as UserTable};
 
 /// Worker tick interval in microseconds (100ms = 10Hz)
 const WORKER_TICK_US: i64 = 100_000;
@@ -193,20 +193,22 @@ fn process_returning(ctx: &ReducerContext, entity: GameEntity, mut worker: Worke
     let arrived = move_towards(ctx, &entity, &mut worker);
 
     if arrived {
-        // Deposit resource
+        // Deposit resource to the worker's owner
         if let Some(resource_type) = worker.carrying_resource {
-            if let Some(mut game_state) = ctx.db.game_state().id().find(0) {
-                match resource_type {
-                    ResourceType::Wood => game_state.wood += RESOURCES_PER_HARVEST,
-                    ResourceType::Gold => game_state.gold += RESOURCES_PER_HARVEST,
-                    ResourceType::Meat => game_state.meat += RESOURCES_PER_HARVEST,
-                }
-                ctx.db.game_state().id().update(game_state);
+            if let Some(owner) = entity.owner {
+                if let Some(mut player) = ctx.db.user().identity().find(owner) {
+                    match resource_type {
+                        ResourceType::Wood => player.wood += RESOURCES_PER_HARVEST,
+                        ResourceType::Gold => player.gold += RESOURCES_PER_HARVEST,
+                        ResourceType::Meat => player.meat += RESOURCES_PER_HARVEST,
+                    }
+                    ctx.db.user().identity().update(player);
 
-                log::debug!(
-                    "Worker {} deposited {:?}",
-                    entity.entity_id, resource_type
-                );
+                    log::debug!(
+                        "Worker {} deposited {:?} for player {:?}",
+                        entity.entity_id, resource_type, owner
+                    );
+                }
             }
         }
 
