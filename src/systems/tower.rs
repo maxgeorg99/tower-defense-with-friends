@@ -182,6 +182,16 @@ pub fn show_tower_wheel_menu(
                         ))
                         .id();
                     commands.entity(circle_entity).add_child(cost_entity);
+
+                    commands.spawn((
+                        Sprite {
+                            image: asset_server.load("UI Elements/UI Elements/Cursors/Cursor_04.png"),
+                            custom_size: Some(Vec2::splat(24.0)),
+                            ..default()
+                        },
+                        Transform::from_xyz(world_pos.x, world_pos.y, 10.0),
+                        TowerWheelMenu,
+                    ));
                 } else {
                     // Show tower options (existing code)
                     let num_towers = tower_configs.towers.len();
@@ -269,18 +279,17 @@ pub fn show_tower_wheel_menu(
                             .id();
                         commands.entity(circle_entity).add_child(cost_entity);
                     }
+                    // Add center build icon indicator
+                    commands.spawn((
+                        Sprite {
+                            image: asset_server.load("UI Elements/UI Elements/Icons/Build_Icon.png"),
+                            custom_size: Some(Vec2::splat(24.0)),
+                            ..default()
+                        },
+                        Transform::from_xyz(world_pos.x, world_pos.y, 10.0),
+                        TowerWheelMenu,
+                    ));
                 }
-
-                // Add center build icon indicator
-                commands.spawn((
-                    Sprite {
-                        image: asset_server.load("UI Elements/UI Elements/Icons/Build_Icon.png"),
-                        custom_size: Some(Vec2::splat(24.0)),
-                        ..default()
-                    },
-                    Transform::from_xyz(world_pos.x, world_pos.y, 10.0),
-                    TowerWheelMenu,
-                ));
             }
         }
     }
